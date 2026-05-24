@@ -1,45 +1,46 @@
 # OpenTrainer Studio
 
-OpenTrainer Studio is a beginner-friendly local workspace for training small
-language models from personal data. It builds on the Stanford CS336 assignment
-structure, then adds a React UI and an MCP-like JSON tool layer so training can
-be driven from a browser, an agent, or another service.
+OpenTrainer Studio is a beginner-friendly personal AI builder. It lets a user
+create separate AI workspaces, attach knowledge files, ask questions from those
+files immediately, and then train or publish only when the AI is ready.
 
-The core idea is simple: anyone should be able to create an AI profile, attach
-data, choose where training runs, and start with a tiny test before scaling to a
-rented GPU.
+It builds on the Stanford CS336 assignment structure, then adds a React UI and
+an MCP-like JSON tool layer so knowledge, training, and serving can be driven
+from a browser, an agent, or another service.
 
 ## What This Project Does
 
 - Creates separate AI profiles for different model ideas.
-- Ingests text and document paths for future training data pipelines.
+- Lets each AI answer from attached `.jsonl`, `.md`, `.txt`, or `.csv` files
+  before any model training.
+- Ingests text and document paths for future knowledge and training pipelines.
 - Tracks local or external GPU targets.
-- Runs a one-click tiny training smoke test before larger jobs.
+- Runs a one-click tiny training environment check before larger jobs.
 - Shows simple training snapshots: status, latest loss, tokens/sec, and loss trend.
-- Provides a per-AI chat panel that calls a C++ AI service once a trained model
-  is registered for serving.
+- Provides a per-AI chat panel with instant file knowledge and raw checkpoint
+  inspection.
+- Optionally registers a trained model with C++ AI Service for RAG, MCP, or apps.
 - Exposes training, data, scaling, system, and C++ service actions as JSON tools.
 - Provides a React frontend at `http://127.0.0.1:8765`.
 - Keeps the original CS336-style assignment modules available for deeper work.
 
 ## Fixed User Flow
 
-1. Open `Train an AI`.
+1. Open `My AIs`.
 2. Create one AI by giving it a name and purpose.
-3. Add a data path, or go to `Add Data` to inspect PDFs/text first.
-4. Choose a training computer:
+3. Add a knowledge path, or go to `Knowledge Tools` to inspect PDFs/text first.
+4. Ask questions in `Instant knowledge from files`.
+5. Choose a training computer only when you want model-weight training:
    - `Local Machine` for smoke tests and UI validation.
    - External GPU server when you rent or own a stronger machine.
-5. Click `Start tiny test`.
-6. Watch status, loss, and tokens/sec in that AI's training workspace.
-7. Use `Chat With This AI` in `Instant knowledge from files` mode to answer from
-   attached materials immediately.
+6. Click `Check Training Environment`.
+7. Watch status, loss, and tokens/sec in that AI's workspace.
 8. Switch to `Raw checkpoint output` when you want to see what the trained model
    itself can currently generate.
-9. If the reply is useful, use `Add To C++ AI Service` to register this AI's
+9. If the AI is useful, use `Add To C++ AI Service` to register this AI's
    trained model path for RAG, MCP, or external apps.
-10. Scale the recipe only after the tiny run works.
-11. Use `Advanced` only for raw tools, experiment debugging, and C++ service
+10. Scale training only after the environment check works.
+11. Use `Developer` only for raw tools, experiment debugging, and C++ service
    integration.
 
 ## How To See Results

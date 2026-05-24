@@ -876,6 +876,45 @@ select:focus {
   line-height: 1.5;
 }
 
+.builder-flow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.builder-flow div {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 3px 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid rgba(31, 111, 235, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.builder-flow span {
+  grid-row: span 2;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent), var(--teal));
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.builder-flow strong {
+  font-size: 13px;
+}
+
+.builder-flow small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .workspace-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1561,6 +1600,7 @@ select:focus {
 
   .ai-hero,
   .simple-hero,
+  .builder-flow,
   .workspace-grid,
   .form-grid,
   .gpu-row {

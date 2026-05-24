@@ -3,10 +3,10 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 
 const titles = {
-  overview: "Home",
-  ai: "Train an AI",
-  data: "Add Data",
-  advanced: "Advanced",
+  overview: "Studio",
+  ai: "My AIs",
+  data: "Knowledge Tools",
+  advanced: "Developer",
 };
 
 function pretty(value) {
@@ -70,8 +70,8 @@ function Sidebar({ activeView, health, onSelect }) {
       <div className="brand">
         <div className="mark">ML</div>
         <div>
-          <h1>AI Trainer</h1>
-          <p>Simple model training</p>
+          <h1>OpenTrainer</h1>
+          <p>Personal AI builder</p>
         </div>
       </div>
       <nav className="nav" aria-label="Primary">
@@ -148,11 +148,11 @@ function Overview({ tools, experiments, systemReport, latest, onView, onTool }) 
 
       <section className="signal-panel" aria-label="Training signal preview">
         <div>
-          <p className="eyebrow">Simple training workspace</p>
-          <h3>Train your own AI without command-line steps</h3>
+          <p className="eyebrow">Personal AI workspace</p>
+          <h3>Create an AI, give it files, ask it questions, then train when ready</h3>
           <p>
-            Create one AI, attach your files, choose where it should train, then run a small test
-            before scaling up.
+            Files become instant knowledge first. Training is an optional upgrade after the AI can
+            already answer from your materials.
           </p>
         </div>
         <div className="signal-rails" aria-hidden="true">
@@ -174,19 +174,19 @@ function Overview({ tools, experiments, systemReport, latest, onView, onTool }) 
         <Panel title="Quick Actions">
           <div className="quick-grid">
             <button className="quick-action" onClick={() => onView("ai")}>
-              Start a new AI
+              Create or open an AI
             </button>
             <button className="quick-action" onClick={() => onView("ai")}>
-              Choose training computer
+              Add knowledge files
             </button>
             <button className="quick-action" onClick={() => onView("data")}>
-              Add PDF or text data
+              Inspect PDF or text
             </button>
             <button className="quick-action" onClick={() => onTool("system.report", {})}>
               Check this machine
             </button>
             <button className="quick-action" onClick={() => onView("advanced")}>
-              Advanced tools
+              Developer tools
             </button>
           </div>
         </Panel>
@@ -737,28 +737,28 @@ function SimpleTraining({
     <section className="view active">
       <section className="simple-hero">
         <div>
-          <p className="eyebrow">For non-engineers</p>
-          <h3>Create an AI in three steps</h3>
+          <p className="eyebrow">Main workflow</p>
+          <h3>Build a personal AI from your own files</h3>
           <p>
-            Give it a name, tell it what to learn, point it at your data. Everything technical is
-            optional until you are ready to scale.
+            Create the AI, attach knowledge, ask questions immediately, then train or publish only
+            when the answers are useful.
           </p>
         </div>
         <div className="simple-flow" aria-label="Simple training flow">
           <span>Create AI</span>
-          <span>Open AI space</span>
-          <span>Add data</span>
-          <span>Train</span>
+          <span>Add knowledge</span>
+          <span>Ask now</span>
+          <span>Train later</span>
         </div>
       </section>
 
       <div className="two-col wide-left">
-        <Panel title="Create Your AI">
+        <Panel title="Create A Personal AI">
           <div className="helper-card plain">
-            <strong>You only need these three things first.</strong>
+            <strong>Start with identity and purpose.</strong>
             <span>
-              Creation only gives the AI a name and goal. After that, it opens its own training
-              space where you add data and run tests.
+              Creation does not train a model yet. It opens a workspace where this AI can read
+              files, answer from them, and later be trained or published.
             </span>
           </div>
           <label>
@@ -774,7 +774,7 @@ function SimpleTraining({
             />
           </label>
           <label>
-            Training files, optional for now.
+            Knowledge files, optional for now.
             <input
               value={form.dataset_path}
               onChange={(event) => updateForm("dataset_path", event.target.value)}
@@ -782,7 +782,7 @@ function SimpleTraining({
             />
           </label>
           <label>
-            Where should training run?
+            Training computer, optional for later.
             <select
               value={form.gpu_target_id}
               onChange={(event) => updateForm("gpu_target_id", event.target.value)}
@@ -826,7 +826,7 @@ function SimpleTraining({
             {aiProfiles.length === 0 ? (
               <div className="empty-state">
                 <strong>No AI yet</strong>
-                <span>Create one first. A separate training space will appear here.</span>
+                <span>Create one first. Its knowledge, chat, training, and publish controls appear here.</span>
               </div>
             ) : (
               aiProfiles.map((profile) => {
@@ -840,7 +840,7 @@ function SimpleTraining({
                   >
                     <span>
                       <strong>{profile.name}</strong>
-                      <small>{profile.dataset_path ? "Data added" : "Needs training data"}</small>
+                      <small>{profile.dataset_path ? "Knowledge attached" : "Needs knowledge files"}</small>
                     </span>
                     <em>{state.running ? "training" : profile.status || "draft"}</em>
                   </button>
@@ -856,22 +856,45 @@ function SimpleTraining({
           <>
             <div className="workspace-head">
               <div>
-                <p className="eyebrow">AI Training Space</p>
+                <p className="eyebrow">Selected AI</p>
                 <h3>{selectedProfile.name}</h3>
                 <p>{selectedProfile.purpose || "No goal added yet."}</p>
               </div>
               <span className="status-pill">{selectedTraining.running ? "training" : selectedProfile.status}</span>
             </div>
 
+            <div className="builder-flow" aria-label="AI builder stages">
+              <div>
+                <span>1</span>
+                <strong>Knowledge</strong>
+                <small>Attach files this AI can read now.</small>
+              </div>
+              <div>
+                <span>2</span>
+                <strong>Chat</strong>
+                <small>Ask from files before training.</small>
+              </div>
+              <div>
+                <span>3</span>
+                <strong>Train</strong>
+                <small>Upgrade model weights when needed.</small>
+              </div>
+              <div>
+                <span>4</span>
+                <strong>Publish</strong>
+                <small>Connect C++ service, RAG, or MCP.</small>
+              </div>
+            </div>
+
             <div className="workspace-grid">
               <div className="material-box">
-                <h4>1. Add Training Materials</h4>
+                <h4>1. Add Knowledge</h4>
                 <p>
-                  Paste the folder or file path for PDFs, notes, text, or JSONL. This belongs only to
-                  this AI.
+                  Paste a folder or file path for PDFs, notes, text, or JSONL. This becomes usable
+                  immediately in chat.
                 </p>
                 <label>
-                  Data path
+                  Knowledge path
                   <input
                     value={materialPath}
                     onChange={(event) => setMaterialPath(event.target.value)}
@@ -879,13 +902,13 @@ function SimpleTraining({
                   />
                 </label>
                 <button className="button primary wide" onClick={saveMaterials}>
-                  Save Materials
+                  Save Knowledge
                 </button>
               </div>
 
               <div className="material-box">
-                <h4>2. Choose Training Computer</h4>
-                <p>Start with any available machine. Switch to an external GPU when the test works.</p>
+                <h4>2. Prepare Training Computer</h4>
+                <p>Only needed when you want to train model weights. File chat works before this.</p>
                 <label>
                   Training computer
                   <select
@@ -908,14 +931,14 @@ function SimpleTraining({
               </div>
 
               <div className="material-box train-box">
-                <h4>3. Run First Training Test</h4>
+                <h4>3. Check Training Environment</h4>
                 <p>
-                  The tiny test is a fast safety check. If loss appears and the run finishes, the AI
-                  is ready for bigger training.
+                  Tiny test proves this machine can run the training stack. It is not real learning
+                  from your files yet.
                 </p>
                 <div className="simple-meta compact">
                   <div>
-                    <span>Files</span>
+                    <span>Knowledge</span>
                     <strong>{selectedProfile.dataset_path || "Not added yet"}</strong>
                   </div>
                   <div>
@@ -928,14 +951,14 @@ function SimpleTraining({
                       {selectedTraining.running
                         ? "Wait for this test to finish"
                         : selectedTraining.metrics?.length
-                          ? "Review result or scale up"
-                          : "Start tiny training test"}
+                          ? "Environment works"
+                          : "Run environment check"}
                     </strong>
                   </div>
                 </div>
                 <div className="workspace-actions">
                   <button className="button primary" onClick={() => onStartTinyTest(selectedProfile)}>
-                    Start Tiny Test
+                    Check Training Environment
                   </button>
                   <button className="button ghost" onClick={() => onRefreshTraining(selectedProfile)}>
                     Refresh Metrics
@@ -974,8 +997,8 @@ function SimpleTraining({
                 <div>
                   <h4>4. Chat With This AI</h4>
                   <p>
-                    Instant knowledge reads attached files immediately. Raw checkpoint shows what
-                    the trained model weights can currently generate.
+                    Ask from knowledge files first. Switch to raw checkpoint only when you are
+                    checking whether training actually changed the model.
                   </p>
                 </div>
                 <span className="status-pill">{chatMode === "data" ? "data preview" : "raw checkpoint"}</span>
@@ -990,8 +1013,8 @@ function SimpleTraining({
               <div className="chat-window" aria-label="AI chat messages">
                 {selectedChat.length === 0 ? (
                   <div className="chat-empty">
-                    No chat yet. Use instant knowledge to answer from files now, or Raw checkpoint
-                    to inspect model generation quality.
+                    No chat yet. Add a knowledge file, keep Instant knowledge selected, then ask
+                    something like "你是谁".
                   </div>
                 ) : (
                   selectedChat.map((message, index) => (
@@ -1020,8 +1043,8 @@ function SimpleTraining({
                 <div>
                   <h4>5. Optional: Add To C++ AI Service</h4>
                   <p>
-                    If the local reply looks good, register this AI as a selectable model in your
-                    service for RAG, MCP, or external apps.
+                    Publish only after the AI answers well enough locally. This is for RAG, MCP, or
+                    external apps.
                   </p>
                 </div>
                 <span className="status-pill">model: {selectedProfile.id}</span>
@@ -1057,7 +1080,7 @@ function SimpleTraining({
                 <button className="button primary" onClick={registerCurrentModel} disabled={chatBusy}>
                   Register This AI
                 </button>
-                <span>Use this only after local chat output is worth serving.</span>
+                <span>Use this after local answers are worth serving outside this app.</span>
               </div>
             </div>
           </>
