@@ -29,7 +29,7 @@ async function postJson(url, body) {
     body: JSON.stringify(body),
   });
   const payload = await response.json();
-  if (!response.ok || payload.error) {
+  if (!response.ok) {
     throw new Error(payload.error || `${response.status} ${response.statusText}`);
   }
   return payload;
@@ -527,6 +527,7 @@ function SimpleTraining({
   const [chatDraft, setChatDraft] = useState("What did you learn from my training materials?");
   const [chatByAi, setChatByAi] = useState({});
   const [chatBusy, setChatBusy] = useState(false);
+  const [chatMode, setChatMode] = useState("data");
   const [modelPath, setModelPath] = useState("");
   const [modelBackend, setModelBackend] = useState("python");
 
@@ -639,7 +640,7 @@ function SimpleTraining({
       ...current,
       [selectedProfile.id]: [...(current[selectedProfile.id] || []), { role: "user", text: prompt }],
     }));
-    const result = await onChatAI(selectedProfile, prompt);
+    const result = await onChatAI(selectedProfile, prompt, chatMode);
     setChatByAi((current) => ({
       ...current,
       [selectedProfile.id]: [
@@ -973,17 +974,24 @@ function SimpleTraining({
                 <div>
                   <h4>4. Chat With This AI</h4>
                   <p>
-                    This directly calls this AI's local checkpoint first. If the answer looks useful,
-                    register it in C++ AI Service later.
+                    Data preview gives a readable answer from attached materials. Raw checkpoint
+                    shows what the trained model itself can currently generate.
                   </p>
                 </div>
-                <span className="status-pill">local test</span>
+                <span className="status-pill">{chatMode === "data" ? "data preview" : "raw checkpoint"}</span>
               </div>
+              <label>
+                Chat mode
+                <select value={chatMode} onChange={(event) => setChatMode(event.target.value)}>
+                  <option value="data">Data preview answer</option>
+                  <option value="checkpoint">Raw checkpoint output</option>
+                </select>
+              </label>
               <div className="chat-window" aria-label="AI chat messages">
                 {selectedChat.length === 0 ? (
                   <div className="chat-empty">
-                    No chat yet. Run a tiny test first, then ask a question here to inspect the
-                    local model output.
+                    No chat yet. Use Data preview to inspect your materials, or Raw checkpoint to
+                    inspect model generation quality.
                   </div>
                 ) : (
                   selectedChat.map((message, index) => (
@@ -1528,7 +1536,13 @@ function App() {
     return result;
   }
 
-  async function chatAI(profile, prompt) {
+  async function chatAI(profile, prompt, mode) {
+    if (mode === "data") {
+      return callTool("ai.answer_from_data", {
+        id: profile.id,
+        prompt,
+      });
+    }
     return callTool("ai.generate_local", {
       id: profile.id,
       prompt,

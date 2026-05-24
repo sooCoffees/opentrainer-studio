@@ -69,6 +69,42 @@ def _ensure_debug_token_data() -> dict[str, str]:
     return {"train_bin": str(train_path), "valid_bin": str(valid_path)}
 
 
+def _read_profile_data(path_value: str | None) -> list[dict[str, str]]:
+    if not path_value:
+        return []
+    path = Path(path_value).expanduser()
+    paths = sorted(item for item in path.iterdir() if item.is_file()) if path.is_dir() else [path]
+    rows: list[dict[str, str]] = []
+    for item in paths:
+        if not item.exists() or item.suffix.lower() not in {".txt", ".md", ".jsonl", ".csv"}:
+            continue
+        if item.suffix.lower() == ".jsonl":
+            for index, line in enumerate(item.read_text(encoding="utf-8", errors="replace").splitlines()):
+                if not line.strip():
+                    continue
+                try:
+                    payload = json.loads(line)
+                except json.JSONDecodeError:
+                    payload = {"text": line}
+                text = str(payload.get("text") or payload.get("content") or payload)
+                title = str(payload.get("title") or payload.get("id") or f"{item.name}:{index + 1}")
+                rows.append({"title": title, "text": text[:2000], "path": str(item)})
+        else:
+            text = item.read_text(encoding="utf-8", errors="replace")
+            rows.append({"title": item.name, "text": text[:4000], "path": str(item)})
+    return rows
+
+
+def _score_text(query: str, text: str) -> int:
+    terms = {
+        term.lower()
+        for term in query.replace("?", " ").replace(".", " ").replace(",", " ").split()
+        if len(term) > 2
+    }
+    haystack = text.lower()
+    return sum(haystack.count(term) for term in terms)
+
+
 def _latest_metric(metrics: list[dict[str, Any]]) -> dict[str, Any] | None:
     return metrics[-1] if metrics else None
 
@@ -223,6 +259,19 @@ class ToolRegistry:
                 ["id", "prompt"],
             ),
             self.ai_generate_local,
+        )
+        self._register(
+            _tool_schema(
+                "ai.answer_from_data",
+                "Preview an answer directly from one AI profile's attached training materials.",
+                {
+                    "id": {"type": "string"},
+                    "prompt": {"type": "string"},
+                    "limit": {"type": "integer"},
+                },
+                ["id", "prompt"],
+            ),
+            self.ai_answer_from_data,
         )
         self._register(
             _tool_schema(
@@ -612,6 +661,43 @@ class ToolRegistry:
             "checkpoint_path": checkpoint_path,
             "tokenizer_path": tokenizer_path,
             "process": result,
+        }
+
+    def ai_answer_from_data(self, args: dict[str, Any]) -> dict[str, Any]:
+        profile = self.ai_store.get(args["id"])
+        rows = _read_profile_data(profile.dataset_path)
+        if not rows:
+            return {
+                "ok": False,
+                "stage": "missing_data",
+                "error": "No readable training materials are attached to this AI yet.",
+                "next_step": "Add a .jsonl, .md, .txt, or .csv path in Add Training Materials first.",
+                "ai_profile": asdict(profile),
+            }
+
+        prompt = args["prompt"]
+        ranked = sorted(
+            rows,
+            key=lambda row: _score_text(prompt, row["title"] + " " + row["text"]),
+            reverse=True,
+        )
+        selected = ranked[: int(args.get("limit", 4))]
+        bullets = "\n".join(
+            f"- {row['title']}: {row['text'].strip()[:420]}" for row in selected
+        )
+        text = (
+            "This is a data preview answer, not a trained-model answer yet.\n\n"
+            "Based on the attached materials, the useful points are:\n"
+            f"{bullets}\n\n"
+            "To make the model itself answer this, run a real training job on these materials, "
+            "then switch Chat mode to Raw checkpoint."
+        )
+        return {
+            "ok": True,
+            "mode": "data_preview",
+            "model": profile.id,
+            "text": text,
+            "sources": selected,
         }
 
     def ai_assign_gpu(self, args: dict[str, Any]) -> dict[str, Any]:
