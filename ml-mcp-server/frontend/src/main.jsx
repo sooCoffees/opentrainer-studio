@@ -974,8 +974,8 @@ function SimpleTraining({
                 <div>
                   <h4>4. Chat With This AI</h4>
                   <p>
-                    Data preview gives a readable answer from attached materials. Raw checkpoint
-                    shows what the trained model itself can currently generate.
+                    Instant knowledge reads attached files immediately. Raw checkpoint shows what
+                    the trained model weights can currently generate.
                   </p>
                 </div>
                 <span className="status-pill">{chatMode === "data" ? "data preview" : "raw checkpoint"}</span>
@@ -983,15 +983,15 @@ function SimpleTraining({
               <label>
                 Chat mode
                 <select value={chatMode} onChange={(event) => setChatMode(event.target.value)}>
-                  <option value="data">Data preview answer</option>
+                  <option value="data">Instant knowledge from files</option>
                   <option value="checkpoint">Raw checkpoint output</option>
                 </select>
               </label>
               <div className="chat-window" aria-label="AI chat messages">
                 {selectedChat.length === 0 ? (
                   <div className="chat-empty">
-                    No chat yet. Use Data preview to inspect your materials, or Raw checkpoint to
-                    inspect model generation quality.
+                    No chat yet. Use instant knowledge to answer from files now, or Raw checkpoint
+                    to inspect model generation quality.
                   </div>
                 ) : (
                   selectedChat.map((message, index) => (

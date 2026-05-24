@@ -96,13 +96,34 @@ def _read_profile_data(path_value: str | None) -> list[dict[str, str]]:
 
 
 def _score_text(query: str, text: str) -> int:
+    compact_query = "".join(query.lower().split())
+    compact_text = "".join(text.lower().split())
     terms = {
         term.lower()
         for term in query.replace("?", " ").replace(".", " ").replace(",", " ").split()
         if len(term) > 2
     }
+    if not terms:
+        terms = {compact_query[index : index + 2] for index in range(max(len(compact_query) - 1, 0))}
     haystack = text.lower()
-    return sum(haystack.count(term) for term in terms)
+    return sum(haystack.count(term) + compact_text.count(term) for term in terms)
+
+
+def _is_identity_question(prompt: str) -> bool:
+    compact = "".join(prompt.lower().split())
+    patterns = ["whoareyou", "what are you", "introduceyourself", "你是谁", "你叫什么", "介绍自己"]
+    return any(pattern.replace(" ", "") in compact for pattern in patterns)
+
+
+def _identity_line(rows: list[dict[str, str]]) -> str | None:
+    markers = ["i am ", "i'm ", "my name is", "name:", "我是", "我叫", "我的名字"]
+    for row in rows:
+        for raw_line in row["text"].replace("。", "。\n").replace(".", ".\n").splitlines():
+            line = raw_line.strip(" -\t")
+            lowered = line.lower()
+            if line and any(marker in lowered or marker in line for marker in markers):
+                return line[:500]
+    return None
 
 
 def _latest_metric(metrics: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -685,13 +706,28 @@ class ToolRegistry:
         bullets = "\n".join(
             f"- {row['title']}: {row['text'].strip()[:420]}" for row in selected
         )
-        text = (
-            "This is a data preview answer, not a trained-model answer yet.\n\n"
-            "Based on the attached materials, the useful points are:\n"
-            f"{bullets}\n\n"
-            "To make the model itself answer this, run a real training job on these materials, "
-            "then switch Chat mode to Raw checkpoint."
-        )
+        if _is_identity_question(prompt):
+            identity = _identity_line(selected) or _identity_line(rows)
+            if identity:
+                text = (
+                    "I can answer that from the materials you attached.\n\n"
+                    f"{identity}\n\n"
+                    "This is instant file-based knowledge. The model weights have not learned it "
+                    "until you run a real training job."
+                )
+            else:
+                text = (
+                    "I do not know who I am yet from the attached materials.\n\n"
+                    "Add a short identity file with a line like `I am ...` or `Name: ...`, then ask again."
+                )
+        else:
+            text = (
+                "I can answer from the materials you attached.\n\n"
+                "Relevant points:\n"
+                f"{bullets}\n\n"
+                "This is instant file-based knowledge. To make the model weights learn it, run a "
+                "real training job and then switch Chat mode to Raw checkpoint."
+            )
         return {
             "ok": True,
             "mode": "data_preview",
