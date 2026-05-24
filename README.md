@@ -32,10 +32,11 @@ rented GPU.
    - External GPU server when you rent or own a stronger machine.
 5. Click `Start tiny test`.
 6. Watch status, loss, and tokens/sec in that AI's training workspace.
-7. Register the trained model in your C++ AI service, then use `Chat With This
-   AI` to ask questions through the model.
-8. Scale the recipe only after the tiny run works.
-9. Use `Advanced` only for raw tools, experiment debugging, and C++ service
+7. Use `Chat With This AI` to directly test the local checkpoint from this AI.
+8. If the reply is useful, use `Add To C++ AI Service` to register this AI's
+   trained model path for RAG, MCP, or external apps.
+9. Scale the recipe only after the tiny run works.
+10. Use `Advanced` only for raw tools, experiment debugging, and C++ service
    integration.
 
 ## How To See Results
@@ -44,13 +45,13 @@ There are two kinds of results:
 
 1. Training health: `Training status`, `Latest loss`, `Tokens/sec`, and the loss
    chart show whether the run is working.
-2. Model behavior: `Chat With This AI` sends prompts to your C++ AI service using
-   the current AI profile id as the model id.
+2. Model behavior: `Chat With This AI` sends prompts directly to this AI's local
+   checkpoint so you can inspect the output before serving it elsewhere.
 
 The tiny test is a smoke test. It proves the training stack is wired correctly;
 it is not expected to produce a smart assistant. For real answers, train or load
-a model, register it in `cpp-ai-service`, and then chat with it from the AI
-workspace.
+a stronger model, test it locally in the AI workspace, then register it in
+`cpp-ai-service` only when you want RAG, MCP, or another app to call it.
 
 ## Quick Start
 

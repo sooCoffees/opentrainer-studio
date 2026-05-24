@@ -504,6 +504,8 @@ function SimpleTraining({
   onRefreshTraining,
   onDeleteAI,
   onChatAI,
+  onCheckChatService,
+  onRegisterModel,
 }) {
   const firstTarget = gpuTargets[0]?.id || "";
   const [form, setForm] = useState({
@@ -525,6 +527,8 @@ function SimpleTraining({
   const [chatDraft, setChatDraft] = useState("What did you learn from my training materials?");
   const [chatByAi, setChatByAi] = useState({});
   const [chatBusy, setChatBusy] = useState(false);
+  const [modelPath, setModelPath] = useState("");
+  const [modelBackend, setModelBackend] = useState("python");
 
   const selectedProfile =
     aiProfiles.find((profile) => profile.id === selectedAiId) || aiProfiles[0] || null;
@@ -546,8 +550,10 @@ function SimpleTraining({
   useEffect(() => {
     if (selectedProfile) {
       setMaterialPath(selectedProfile.dataset_path || "");
+      setModelPath(selectedProfile.metadata?.model_path || selectedProfile.metadata?.checkpoint_path || "");
     } else {
       setMaterialPath("");
+      setModelPath("");
     }
   }, [selectedProfile?.id, selectedProfile?.dataset_path]);
 
@@ -608,6 +614,9 @@ function SimpleTraining({
   }
 
   function extractAssistantText(result) {
+    if (result?.ok === false) {
+      return [result.error, result.next_step].filter(Boolean).join("\n\n");
+    }
     if (result?.error) return result.error;
     return (
       result?.text ||
@@ -630,7 +639,7 @@ function SimpleTraining({
       ...current,
       [selectedProfile.id]: [...(current[selectedProfile.id] || []), { role: "user", text: prompt }],
     }));
-    const result = await onChatAI(selectedProfile, prompt, chatBaseUrl);
+    const result = await onChatAI(selectedProfile, prompt);
     setChatByAi((current) => ({
       ...current,
       [selectedProfile.id]: [
@@ -638,6 +647,59 @@ function SimpleTraining({
         {
           role: result?.error ? "system" : "assistant",
           text: extractAssistantText(result),
+        },
+      ],
+    }));
+    setChatBusy(false);
+  }
+
+  async function checkChatService() {
+    if (!selectedProfile) return;
+    setChatBusy(true);
+    const result = await onCheckChatService(chatBaseUrl);
+    setChatByAi((current) => ({
+      ...current,
+      [selectedProfile.id]: [
+        ...(current[selectedProfile.id] || []),
+        {
+          role: result?.ok === false || result?.error ? "system" : "assistant",
+          text:
+            result?.ok === false || result?.error
+              ? extractAssistantText(result)
+              : `Service is online.\n\n${pretty(result)}`,
+        },
+      ],
+    }));
+    setChatBusy(false);
+  }
+
+  async function registerCurrentModel() {
+    if (!selectedProfile || chatBusy) return;
+    if (!modelPath.trim()) {
+      setChatByAi((current) => ({
+        ...current,
+        [selectedProfile.id]: [
+          ...(current[selectedProfile.id] || []),
+          {
+            role: "system",
+            text: "Add the trained model or checkpoint path first, then register it in C++ AI Service.",
+          },
+        ],
+      }));
+      return;
+    }
+    setChatBusy(true);
+    const result = await onRegisterModel(selectedProfile, chatBaseUrl, modelPath.trim(), modelBackend);
+    setChatByAi((current) => ({
+      ...current,
+      [selectedProfile.id]: [
+        ...(current[selectedProfile.id] || []),
+        {
+          role: result?.ok === false || result?.error ? "system" : "assistant",
+          text:
+            result?.ok === false || result?.error
+              ? extractAssistantText(result)
+              : `Registered this AI in C++ AI Service as model "${selectedProfile.id}".\n\n${pretty(result)}`,
         },
       ],
     }));
@@ -911,20 +973,17 @@ function SimpleTraining({
                 <div>
                   <h4>4. Chat With This AI</h4>
                   <p>
-                    This tests the model through your C++ AI service. Run training first, register
-                    the trained model in the service, then ask questions here.
+                    This directly calls this AI's local checkpoint first. If the answer looks useful,
+                    register it in C++ AI Service later.
                   </p>
                 </div>
-                <span className="status-pill">model: {selectedProfile.id}</span>
+                <span className="status-pill">local test</span>
               </div>
-              <label>
-                C++ AI service URL
-                <input value={chatBaseUrl} onChange={(event) => setChatBaseUrl(event.target.value)} />
-              </label>
               <div className="chat-window" aria-label="AI chat messages">
                 {selectedChat.length === 0 ? (
                   <div className="chat-empty">
-                    No chat yet. Ask a question after the model is registered in your service.
+                    No chat yet. Run a tiny test first, then ask a question here to inspect the
+                    local model output.
                   </div>
                 ) : (
                   selectedChat.map((message, index) => (
@@ -945,6 +1004,52 @@ function SimpleTraining({
                 <button className="button primary" onClick={sendChat} disabled={chatBusy}>
                   {chatBusy ? "Sending..." : "Send"}
                 </button>
+              </div>
+            </div>
+
+            <div className="serve-workspace">
+              <div className="chat-head">
+                <div>
+                  <h4>5. Optional: Add To C++ AI Service</h4>
+                  <p>
+                    If the local reply looks good, register this AI as a selectable model in your
+                    service for RAG, MCP, or external apps.
+                  </p>
+                </div>
+                <span className="status-pill">model: {selectedProfile.id}</span>
+              </div>
+              <label>
+                C++ AI service URL
+                <input value={chatBaseUrl} onChange={(event) => setChatBaseUrl(event.target.value)} />
+              </label>
+              <div className="form-grid">
+                <label>
+                  Trained model or checkpoint path
+                  <input
+                    value={modelPath}
+                    onChange={(event) => setModelPath(event.target.value)}
+                    placeholder="/path/to/trained-model-or-checkpoint"
+                  />
+                </label>
+                <label>
+                  Serving backend
+                  <select value={modelBackend} onChange={(event) => setModelBackend(event.target.value)}>
+                    <option value="python">Python checkpoint</option>
+                    <option value="gguf">GGUF</option>
+                    <option value="torch">Torch</option>
+                    <option value="onnx">ONNX</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </label>
+              </div>
+              <div className="chat-service-actions">
+                <button className="button ghost" onClick={checkChatService} disabled={chatBusy}>
+                  Check Service
+                </button>
+                <button className="button primary" onClick={registerCurrentModel} disabled={chatBusy}>
+                  Register This AI
+                </button>
+                <span>Use this only after local chat output is worth serving.</span>
               </div>
             </div>
           </>
@@ -1423,11 +1528,24 @@ function App() {
     return result;
   }
 
-  async function chatAI(profile, prompt, baseUrl) {
-    return callCpp("cpp.generate", {
-      base_url: baseUrl,
-      model: profile.id,
+  async function chatAI(profile, prompt) {
+    return callTool("ai.generate_local", {
+      id: profile.id,
       prompt,
+      max_new_tokens: 80,
+    });
+  }
+
+  async function checkChatService(baseUrl) {
+    return callCpp("cpp.health", { base_url: baseUrl });
+  }
+
+  async function registerModel(profile, baseUrl, path, backend) {
+    return callCpp("cpp.register_model", {
+      base_url: baseUrl,
+      model_id: profile.id,
+      path,
+      backend,
     });
   }
 
@@ -1484,6 +1602,8 @@ function App() {
             onRefreshTraining={refreshTraining}
             onDeleteAI={deleteAI}
             onChatAI={chatAI}
+            onCheckChatService={checkChatService}
+            onRegisterModel={registerModel}
           />
         )}
         {activeView === "data" && (

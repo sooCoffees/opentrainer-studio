@@ -208,6 +208,24 @@ class ToolRegistry:
         )
         self._register(
             _tool_schema(
+                "ai.generate_local",
+                "Generate a reply directly from one AI profile's local checkpoint.",
+                {
+                    "id": {"type": "string"},
+                    "prompt": {"type": "string"},
+                    "checkpoint_path": {"type": "string"},
+                    "tokenizer_path": {"type": "string"},
+                    "max_new_tokens": {"type": "integer"},
+                    "temperature": {"type": "number"},
+                    "top_k": {"type": "integer"},
+                    "timeout": {"type": "integer"},
+                },
+                ["id", "prompt"],
+            ),
+            self.ai_generate_local,
+        )
+        self._register(
+            _tool_schema(
                 "ai.assign_gpu",
                 "Assign an AI profile to a local or remote GPU target.",
                 {
@@ -526,6 +544,74 @@ class ToolRegistry:
             "metrics_path": metrics["path"],
             "metrics": metrics["metrics"],
             "latest_metric": _latest_metric(metrics["metrics"]),
+        }
+
+    def ai_generate_local(self, args: dict[str, Any]) -> dict[str, Any]:
+        profile = self.ai_store.get(args["id"])
+        checkpoint_path = args.get("checkpoint_path") or profile.metadata.get("checkpoint_path")
+        if not checkpoint_path and profile.experiment_id:
+            experiment = self.store.get(profile.experiment_id)
+            run_dir = Path(experiment.run_dir or EXPERIMENTS_DIR / profile.experiment_id)
+            candidates = [
+                run_dir / "tiny_a1_run" / "checkpoint.pt",
+                run_dir / "checkpoint.pt",
+            ]
+            checkpoint_path = next((str(path) for path in candidates if path.exists()), None)
+
+        tokenizer_path = (
+            args.get("tokenizer_path")
+            or profile.metadata.get("tokenizer_path")
+            or str(A1_ROOT / "artifacts" / "debug" / "tokenizer")
+        )
+
+        if not checkpoint_path or not Path(checkpoint_path).exists():
+            return {
+                "ok": False,
+                "stage": "missing_checkpoint",
+                "error": "No local checkpoint found for this AI yet.",
+                "next_step": "Run the tiny test or train a model first, then try Chat With This AI again.",
+                "ai_profile": asdict(profile),
+            }
+
+        if not Path(tokenizer_path).exists():
+            return {
+                "ok": False,
+                "stage": "missing_tokenizer",
+                "error": "No tokenizer found for local generation.",
+                "next_step": "Train or provide a tokenizer path before chatting with the local checkpoint.",
+                "checkpoint_path": checkpoint_path,
+                "tokenizer_path": tokenizer_path,
+            }
+
+        py = python_bin(A1_ROOT)
+        result = run_capture(
+            [
+                str(py),
+                "-m",
+                "scripts.generate",
+                "--checkpoint",
+                checkpoint_path,
+                "--tokenizer",
+                tokenizer_path,
+                "--prompt",
+                args["prompt"],
+                "--max-new-tokens",
+                str(args.get("max_new_tokens", 80)),
+                "--temperature",
+                str(args.get("temperature", 0.8)),
+                "--top-k",
+                str(args.get("top_k", 50)),
+            ],
+            cwd=A1_ROOT,
+            timeout=int(args.get("timeout", 120)),
+        )
+        return {
+            "ok": result.get("returncode") == 0,
+            "model": profile.id,
+            "text": result.get("stdout", "").strip(),
+            "checkpoint_path": checkpoint_path,
+            "tokenizer_path": tokenizer_path,
+            "process": result,
         }
 
     def ai_assign_gpu(self, args: dict[str, Any]) -> dict[str, Any]:

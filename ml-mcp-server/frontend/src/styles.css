@@ -925,6 +925,7 @@ select:focus {
   margin: 0;
 }
 
+.serve-workspace,
 .chat-workspace {
   display: grid;
   gap: 12px;
@@ -934,6 +935,12 @@ select:focus {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.88)),
     radial-gradient(circle at 0% 100%, rgba(31, 111, 235, 0.1), transparent 34%);
+}
+
+.serve-workspace {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 253, 250, 0.86)),
+    radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.12), transparent 34%);
 }
 
 .chat-head {
@@ -966,6 +973,18 @@ select:focus {
   border-radius: 8px;
   background: rgba(15, 23, 42, 0.94);
   overflow: auto;
+}
+
+.chat-service-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.chat-service-actions span {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .chat-empty {
@@ -1557,6 +1576,11 @@ select:focus {
 
   .chat-compose {
     grid-template-columns: 1fr;
+  }
+
+  .chat-service-actions {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .simple-flow,
