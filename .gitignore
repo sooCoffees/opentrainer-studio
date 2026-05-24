@@ -1,0 +1,30 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+node_modules/
+dist/
+build/
+coverage/
+.env
+.env.*
+*.log
+
+# Local training outputs and runtime state.
+artifacts/
+runs/
+experiments/
+state/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+
+# Keep source configs and small examples, but do not commit generated datasets.
+data/raw/
+data/processed/

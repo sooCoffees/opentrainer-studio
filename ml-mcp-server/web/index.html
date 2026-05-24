@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CS336 ML Control</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="mark">ML</div>
+          <div>
+            <h1>CS336 Control</h1>
+            <p>MCP-like training interface</p>
+          </div>
+        </div>
+        <nav class="nav" aria-label="Primary">
+          <button class="nav-item active" data-view="overview">Overview</button>
+          <button class="nav-item" data-view="experiments">Experiments</button>
+          <button class="nav-item" data-view="tools">Tools</button>
+          <button class="nav-item" data-view="data">Data</button>
+          <button class="nav-item" data-view="cpp">C++ Service</button>
+        </nav>
+        <div class="status-block">
+          <span class="status-dot" id="healthDot"></span>
+          <span id="healthText">Checking server</span>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Local workspace</p>
+            <h2 id="viewTitle">Overview</h2>
+          </div>
+          <div class="actions">
+            <button class="button ghost" id="refreshBtn">Refresh</button>
+            <button class="button primary" id="systemReportBtn">System report</button>
+          </div>
+        </header>
+
+        <section class="view active" id="overview">
+          <div class="metrics-grid">
+            <div class="metric">
+              <span>Tools</span>
+              <strong id="toolCount">0</strong>
+            </div>
+            <div class="metric">
+              <span>Experiments</span>
+              <strong id="experimentCount">0</strong>
+            </div>
+            <div class="metric">
+              <span>Device</span>
+              <strong id="deviceName">Unknown</strong>
+            </div>
+            <div class="metric">
+              <span>CUDA</span>
+              <strong id="cudaState">Unknown</strong>
+            </div>
+          </div>
+
+          <div class="split">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Quick Actions</h3>
+              </div>
+              <div class="quick-grid">
+                <button class="quick-action" data-tool="system.report">Run system report</button>
+                <button class="quick-action" data-view-target="experiments">Create experiment</button>
+                <button class="quick-action" data-view-target="data">Filter sample text</button>
+                <button class="quick-action" data-view-target="tools">Open tool runner</button>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Latest Output</h3>
+              </div>
+              <pre class="output" id="latestOutput">{}</pre>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="experiments">
+          <div class="two-col">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Create Experiment</h3>
+              </div>
+              <label>
+                Experiment ID
+                <input id="experimentId" placeholder="tiny-run-001" />
+              </label>
+              <label>
+                Name
+                <input id="experimentName" placeholder="Tiny debug run" />
+              </label>
+              <label>
+                Metadata JSON
+                <textarea id="experimentMetadata" rows="5">{}</textarea>
+              </label>
+              <button class="button primary wide" id="createExperimentBtn">Create</button>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Experiments</h3>
+              </div>
+              <div class="list" id="experimentList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="tools">
+          <div class="two-col wide-left">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Tool Runner</h3>
+              </div>
+              <label>
+                Tool
+                <select id="toolSelect"></select>
+              </label>
+              <p class="hint" id="toolDescription"></p>
+              <label>
+                Arguments JSON
+                <textarea id="toolArgs" rows="12">{}</textarea>
+              </label>
+              <button class="button primary wide" id="callToolBtn">Call Tool</button>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Available Tools</h3>
+              </div>
+              <div class="tool-list" id="toolList"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="data">
+          <div class="two-col wide-left">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Data Filter</h3>
+              </div>
+              <label>
+                Text
+                <textarea id="dataText" rows="12">Hello email me at test@example.com. This is a clean English paragraph with useful words.</textarea>
+              </label>
+              <button class="button primary wide" id="filterTextBtn">Filter Text</button>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Filter Result</h3>
+              </div>
+              <div class="kv" id="dataResult"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="cpp">
+          <div class="two-col">
+            <section class="panel">
+              <div class="panel-head">
+                <h3>C++ Service Bridge</h3>
+              </div>
+              <label>
+                Base URL
+                <input id="cppBaseUrl" value="http://127.0.0.1:8080" />
+              </label>
+              <label>
+                Prompt
+                <textarea id="cppPrompt" rows="6">Hello from CS336 control.</textarea>
+              </label>
+              <div class="button-row">
+                <button class="button ghost" id="cppHealthBtn">Health</button>
+                <button class="button primary" id="cppGenerateBtn">Generate</button>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h3>Bridge Output</h3>
+              </div>
+              <pre class="output" id="cppOutput">{}</pre>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
+
