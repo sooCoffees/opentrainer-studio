@@ -496,6 +496,7 @@ function SimpleTraining({
   gpuTargets,
   trainingByAi,
   onCreateAI,
+  onUpdateAI,
   onCreateGpu,
   onAssignGpu,
   onCheckGpu,
@@ -517,12 +518,32 @@ function SimpleTraining({
     endpoint: "http://your-gpu-server:8765",
     ssh_host: "",
   });
+  const [selectedAiId, setSelectedAiId] = useState(aiProfiles[0]?.id || "");
+  const [materialPath, setMaterialPath] = useState("");
+
+  const selectedProfile =
+    aiProfiles.find((profile) => profile.id === selectedAiId) || aiProfiles[0] || null;
+  const selectedTraining = selectedProfile ? trainingByAi[selectedProfile.id] || {} : {};
 
   useEffect(() => {
     if (!form.gpu_target_id && firstTarget) {
       setForm((current) => ({ ...current, gpu_target_id: firstTarget }));
     }
   }, [firstTarget, form.gpu_target_id]);
+
+  useEffect(() => {
+    if (!selectedAiId && aiProfiles.length > 0) {
+      setSelectedAiId(aiProfiles[0].id);
+    }
+  }, [aiProfiles, selectedAiId]);
+
+  useEffect(() => {
+    if (selectedProfile) {
+      setMaterialPath(selectedProfile.dataset_path || "");
+    } else {
+      setMaterialPath("");
+    }
+  }, [selectedProfile?.id, selectedProfile?.dataset_path]);
 
   function updateForm(key, value) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -541,9 +562,9 @@ function SimpleTraining({
     return `${target.name} - external GPU`;
   }
 
-  function createProfile() {
+  async function createProfile() {
     const id = `${slugify(form.name)}-${Date.now().toString().slice(-5)}`;
-    onCreateAI({
+    const result = await onCreateAI({
       id,
       name: form.name,
       purpose: form.purpose,
@@ -553,6 +574,9 @@ function SimpleTraining({
       config_path: form.config_path,
       notes: "Created from the simple training wizard.",
     });
+    const createdId = result?.ai_profile?.id || result?.json?.ai_profile?.id || id;
+    setSelectedAiId(createdId);
+    setMaterialPath(form.dataset_path || "");
   }
 
   function addRemoteTarget() {
@@ -570,6 +594,11 @@ function SimpleTraining({
 
   function trainingState(profile) {
     return trainingByAi[profile.id] || {};
+  }
+
+  async function saveMaterials() {
+    if (!selectedProfile) return;
+    await onUpdateAI(selectedProfile.id, { dataset_path: materialPath });
   }
 
   function TrainingChart({ metrics }) {
@@ -610,9 +639,9 @@ function SimpleTraining({
           </p>
         </div>
         <div className="simple-flow" aria-label="Simple training flow">
-          <span>Name AI</span>
-          <span>Add files</span>
-          <span>Choose GPU</span>
+          <span>Create AI</span>
+          <span>Open AI space</span>
+          <span>Add data</span>
           <span>Train</span>
         </div>
       </section>
@@ -622,8 +651,8 @@ function SimpleTraining({
           <div className="helper-card plain">
             <strong>You only need these three things first.</strong>
             <span>
-              If you do not have data ready, create the AI now and add files later from the Add
-              Data page.
+              Creation only gives the AI a name and goal. After that, it opens its own training
+              space where you add data and run tests.
             </span>
           </div>
           <label>
@@ -639,7 +668,7 @@ function SimpleTraining({
             />
           </label>
           <label>
-            Where are your files? Optional for now.
+            Training files, optional for now.
             <input
               value={form.dataset_path}
               onChange={(event) => updateForm("dataset_path", event.target.value)}
@@ -686,26 +715,161 @@ function SimpleTraining({
           </button>
         </Panel>
 
-        <Panel title="After You Create It">
-          <div className="next-steps">
-            <div>
-              <span>1</span>
-              <strong>Add data</strong>
-              <p>Use PDFs, text files, notes, or JSONL. The system extracts or filters them first.</p>
-            </div>
-            <div>
-              <span>2</span>
-              <strong>Run a tiny test</strong>
-              <p>Use the small default recipe to make sure the data and GPU connection work.</p>
-            </div>
-            <div>
-              <span>3</span>
-              <strong>Scale up</strong>
-              <p>Switch to a stronger rented GPU only after the tiny run succeeds.</p>
-            </div>
+        <Panel title="Your AI Spaces">
+          <div className="ai-selector-list">
+            {aiProfiles.length === 0 ? (
+              <div className="empty-state">
+                <strong>No AI yet</strong>
+                <span>Create one first. A separate training space will appear here.</span>
+              </div>
+            ) : (
+              aiProfiles.map((profile) => {
+                const state = trainingState(profile);
+                return (
+                  <button
+                    className={`selector-card ${selectedProfile?.id === profile.id ? "active" : ""}`}
+                    key={profile.id}
+                    onClick={() => setSelectedAiId(profile.id)}
+                    type="button"
+                  >
+                    <span>
+                      <strong>{profile.name}</strong>
+                      <small>{profile.dataset_path ? "Data added" : "Needs training data"}</small>
+                    </span>
+                    <em>{state.running ? "training" : profile.status || "draft"}</em>
+                  </button>
+                );
+              })
+            )}
           </div>
         </Panel>
       </div>
+
+      <section className="training-workspace" aria-label="Selected AI training workspace">
+        {selectedProfile ? (
+          <>
+            <div className="workspace-head">
+              <div>
+                <p className="eyebrow">AI Training Space</p>
+                <h3>{selectedProfile.name}</h3>
+                <p>{selectedProfile.purpose || "No goal added yet."}</p>
+              </div>
+              <span className="status-pill">{selectedTraining.running ? "training" : selectedProfile.status}</span>
+            </div>
+
+            <div className="workspace-grid">
+              <div className="material-box">
+                <h4>1. Add Training Materials</h4>
+                <p>
+                  Paste the folder or file path for PDFs, notes, text, or JSONL. This belongs only to
+                  this AI.
+                </p>
+                <label>
+                  Data path
+                  <input
+                    value={materialPath}
+                    onChange={(event) => setMaterialPath(event.target.value)}
+                    placeholder="/path/to/my-ai-training-data"
+                  />
+                </label>
+                <button className="button primary wide" onClick={saveMaterials}>
+                  Save Materials
+                </button>
+              </div>
+
+              <div className="material-box">
+                <h4>2. Choose Training Computer</h4>
+                <p>Start with any available machine. Switch to an external GPU when the test works.</p>
+                <label>
+                  Training computer
+                  <select
+                    value={selectedProfile.gpu_target_id || ""}
+                    onChange={(event) => onAssignGpu(selectedProfile.id, event.target.value)}
+                  >
+                    <option value="">Choose later</option>
+                    {gpuTargets.map((target) => (
+                      <option value={target.id} key={target.id}>
+                        {targetLabel(target)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {selectedProfile.gpu_target_id && (
+                  <button className="button ghost wide" onClick={() => onCheckGpu(selectedProfile.gpu_target_id)}>
+                    Check Connection
+                  </button>
+                )}
+              </div>
+
+              <div className="material-box train-box">
+                <h4>3. Run First Training Test</h4>
+                <p>
+                  The tiny test is a fast safety check. If loss appears and the run finishes, the AI
+                  is ready for bigger training.
+                </p>
+                <div className="simple-meta compact">
+                  <div>
+                    <span>Files</span>
+                    <strong>{selectedProfile.dataset_path || "Not added yet"}</strong>
+                  </div>
+                  <div>
+                    <span>Training computer</span>
+                    <strong>{targetName(selectedProfile.gpu_target_id)}</strong>
+                  </div>
+                  <div>
+                    <span>Next action</span>
+                    <strong>
+                      {selectedTraining.running
+                        ? "Wait for this test to finish"
+                        : selectedTraining.metrics?.length
+                          ? "Review result or scale up"
+                          : "Start tiny training test"}
+                    </strong>
+                  </div>
+                </div>
+                <div className="workspace-actions">
+                  <button className="button primary" onClick={() => onStartTinyTest(selectedProfile)}>
+                    Start Tiny Test
+                  </button>
+                  <button className="button ghost" onClick={() => onRefreshTraining(selectedProfile)}>
+                    Refresh Metrics
+                  </button>
+                  <button className="button danger" onClick={() => onDeleteAI(selectedProfile)}>
+                    Delete AI
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="training-snapshot workspace-snapshot">
+              <div className="snapshot-head">
+                <div>
+                  <span>Training status</span>
+                  <strong>
+                    {selectedTraining.running
+                      ? "Running"
+                      : selectedTraining.experiment?.status || selectedProfile.status}
+                  </strong>
+                </div>
+                <div>
+                  <span>Latest loss</span>
+                  <strong>{formatNumber(metricLoss(selectedTraining.latest_metric))}</strong>
+                </div>
+                <div>
+                  <span>Tokens/sec</span>
+                  <strong>{formatNumber(metricSpeed(selectedTraining.latest_metric), 1)}</strong>
+                </div>
+              </div>
+              <TrainingChart metrics={selectedTraining.metrics} />
+            </div>
+          </>
+        ) : (
+          <div className="empty-state">
+            <strong>Create an AI first</strong>
+            <span>After creation, this area becomes that AI's dedicated training workspace.</span>
+          </div>
+        )}
+      </section>
 
       <div className="two-col gpu-section">
         <Panel title="Optional: Connect External GPU">
@@ -742,100 +906,6 @@ function SimpleTraining({
           <button className="button primary wide" onClick={addRemoteTarget}>
             Save External GPU
           </button>
-        </Panel>
-
-        <Panel title="Your AIs">
-          <div className="ai-grid simple-list">
-            {aiProfiles.length === 0 ? (
-              <div className="empty-state">
-                <strong>No AI yet</strong>
-                <span>Create one on the left. It will appear here with its data and training target.</span>
-              </div>
-            ) : (
-              aiProfiles.map((profile) => (
-                <div className="ai-card simple-card" key={profile.id}>
-                  <div className="ai-card-head">
-                    <div>
-                      <div className="row-title">{profile.name}</div>
-                      <div className="row-meta">{profile.purpose || "No purpose set."}</div>
-                    </div>
-                    <span className="status-pill">{profile.status}</span>
-                  </div>
-                  <div className="simple-meta">
-                    <div>
-                      <span>Files</span>
-                      <strong>{profile.dataset_path || "Not added yet"}</strong>
-                    </div>
-                    <div>
-                      <span>Training computer</span>
-                      <strong>{targetName(profile.gpu_target_id)}</strong>
-                    </div>
-                    <div>
-                      <span>Next action</span>
-                      <strong>
-                        {trainingState(profile).running
-                          ? "Tiny test running"
-                          : trainingState(profile).metrics?.length
-                            ? "Review result, then scale up"
-                            : "Run tiny training test"}
-                      </strong>
-                    </div>
-                  </div>
-                  <div className="training-snapshot">
-                    <div className="snapshot-head">
-                      <div>
-                        <span>Training snapshot</span>
-                        <strong>
-                          {trainingState(profile).running
-                            ? "Running"
-                            : trainingState(profile).experiment?.status || profile.status}
-                        </strong>
-                      </div>
-                      <div>
-                        <span>Latest loss</span>
-                        <strong>{formatNumber(metricLoss(trainingState(profile).latest_metric))}</strong>
-                      </div>
-                      <div>
-                        <span>Tokens/sec</span>
-                        <strong>{formatNumber(metricSpeed(trainingState(profile).latest_metric), 1)}</strong>
-                      </div>
-                    </div>
-                    <TrainingChart metrics={trainingState(profile).metrics} />
-                  </div>
-                  <label>
-                    Change training computer
-                    <select
-                      value={profile.gpu_target_id || ""}
-                      onChange={(event) => onAssignGpu(profile.id, event.target.value)}
-                    >
-                      <option value="">Choose later</option>
-                      {gpuTargets.map((target) => (
-                        <option value={target.id} key={target.id}>
-                          {targetLabel(target)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="card-actions split-actions">
-                    <button className="button primary" onClick={() => onStartTinyTest(profile)}>
-                      Start tiny test
-                    </button>
-                    <button className="button ghost" onClick={() => onRefreshTraining(profile)}>
-                      Refresh metrics
-                    </button>
-                    {profile.gpu_target_id && (
-                      <button className="button ghost" onClick={() => onCheckGpu(profile.gpu_target_id)}>
-                        Check GPU
-                      </button>
-                    )}
-                    <button className="button danger" onClick={() => onDeleteAI(profile)}>
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
         </Panel>
       </div>
     </section>
@@ -1206,8 +1276,15 @@ function App() {
   }
 
   async function createAI(form) {
-    await callTool("ai.create", form);
+    const result = await callTool("ai.create", form);
     await refreshAll();
+    return result;
+  }
+
+  async function updateAI(id, patch) {
+    const result = await callTool("ai.update", { id, patch });
+    await refreshAll();
+    return result;
   }
 
   async function createGpu(form) {
@@ -1305,6 +1382,7 @@ function App() {
             gpuTargets={gpuTargets}
             trainingByAi={trainingByAi}
             onCreateAI={createAI}
+            onUpdateAI={updateAI}
             onCreateGpu={createGpu}
             onAssignGpu={assignGpu}
             onCheckGpu={checkGpu}
