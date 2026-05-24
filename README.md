@@ -14,6 +14,8 @@ rented GPU.
 - Creates separate AI profiles for different model ideas.
 - Ingests text and document paths for future training data pipelines.
 - Tracks local or external GPU targets.
+- Runs a one-click tiny training smoke test before larger jobs.
+- Shows simple training snapshots: status, latest loss, tokens/sec, and loss trend.
 - Exposes training, data, scaling, system, and C++ service actions as JSON tools.
 - Provides a React frontend at `http://127.0.0.1:8765`.
 - Keeps the original CS336-style assignment modules available for deeper work.
@@ -26,9 +28,10 @@ rented GPU.
 4. Choose a training computer:
    - `Local Machine` for smoke tests and UI validation.
    - External GPU server when you rent or own a stronger machine.
-5. Run a tiny test recipe first.
-6. Scale the recipe only after the tiny run works.
-7. Use `Advanced` only for raw tools, experiment debugging, and C++ service
+5. Click `Start tiny test`.
+6. Watch status, loss, and tokens/sec on the AI card.
+7. Scale the recipe only after the tiny run works.
+8. Use `Advanced` only for raw tools, experiment debugging, and C++ service
    integration.
 
 ## Quick Start
@@ -97,6 +100,8 @@ curl -s http://127.0.0.1:8765/call \
 Main tool groups:
 
 - `ai.*`: create, list, update, delete, and assign GPU targets for AI profiles.
+- `ai.start_tiny_test`: launch the default tiny smoke test for one AI profile.
+- `ai.training_snapshot`: read user-friendly status and recent training metrics.
 - `gpu.*`: create/list/check local or external training machines.
 - `data.*`: filter text and inspect/extract document inputs.
 - `training.*`: start, stop, inspect status, and read metrics.

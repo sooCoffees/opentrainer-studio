@@ -48,6 +48,22 @@ function slugify(value) {
     .slice(0, 48) || "my-ai";
 }
 
+function formatNumber(value, digits = 3) {
+  if (value === undefined || value === null || Number.isNaN(Number(value))) return "n/a";
+  const number = Number(value);
+  if (Math.abs(number) >= 1000) return Math.round(number).toLocaleString();
+  return number.toFixed(digits).replace(/\.?0+$/, "");
+}
+
+function metricLoss(metric) {
+  if (!metric) return null;
+  return metric.valid_loss ?? metric.train_loss ?? metric.loss ?? null;
+}
+
+function metricSpeed(metric) {
+  return metric?.tokens_per_sec ?? null;
+}
+
 function Sidebar({ activeView, health, onSelect }) {
   return (
     <aside className="sidebar">
@@ -478,10 +494,13 @@ function AIManager({
 function SimpleTraining({
   aiProfiles,
   gpuTargets,
+  trainingByAi,
   onCreateAI,
   onCreateGpu,
   onAssignGpu,
   onCheckGpu,
+  onStartTinyTest,
+  onRefreshTraining,
   onDeleteAI,
 }) {
   const firstTarget = gpuTargets[0]?.id || "";
@@ -547,6 +566,36 @@ function SimpleTraining({
       ssh_host: remote.ssh_host,
       notes: "External GPU server for training.",
     });
+  }
+
+  function trainingState(profile) {
+    return trainingByAi[profile.id] || {};
+  }
+
+  function TrainingChart({ metrics }) {
+    const points = (metrics || []).filter((metric) => metricLoss(metric) !== null).slice(-18);
+    if (points.length === 0) {
+      return <div className="chart-empty">No metrics yet. Start a tiny test to see loss.</div>;
+    }
+    const losses = points.map((metric) => Number(metricLoss(metric)));
+    const maxLoss = Math.max(...losses);
+    const minLoss = Math.min(...losses);
+    const spread = Math.max(maxLoss - minLoss, 1e-6);
+    return (
+      <div className="loss-bars" aria-label="Loss trend">
+        {points.map((metric, index) => {
+          const loss = Number(metricLoss(metric));
+          const height = 20 + ((maxLoss - loss) / spread) * 64;
+          return (
+            <span
+              key={`${metric.iter ?? index}-${index}`}
+              title={`iter ${metric.iter ?? "?"}: loss ${formatNumber(loss)}`}
+              style={{ "--bar-height": `${height}%` }}
+            />
+          );
+        })}
+      </div>
+    );
   }
 
   return (
@@ -724,13 +773,34 @@ function SimpleTraining({
                     <div>
                       <span>Next action</span>
                       <strong>
-                        {!profile.dataset_path
-                          ? "Add files"
-                          : profile.config_path
-                            ? "Run tiny training test"
-                            : "Choose recipe"}
+                        {trainingState(profile).running
+                          ? "Tiny test running"
+                          : trainingState(profile).metrics?.length
+                            ? "Review result, then scale up"
+                            : "Run tiny training test"}
                       </strong>
                     </div>
+                  </div>
+                  <div className="training-snapshot">
+                    <div className="snapshot-head">
+                      <div>
+                        <span>Training snapshot</span>
+                        <strong>
+                          {trainingState(profile).running
+                            ? "Running"
+                            : trainingState(profile).experiment?.status || profile.status}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Latest loss</span>
+                        <strong>{formatNumber(metricLoss(trainingState(profile).latest_metric))}</strong>
+                      </div>
+                      <div>
+                        <span>Tokens/sec</span>
+                        <strong>{formatNumber(metricSpeed(trainingState(profile).latest_metric), 1)}</strong>
+                      </div>
+                    </div>
+                    <TrainingChart metrics={trainingState(profile).metrics} />
                   </div>
                   <label>
                     Change training computer
@@ -747,6 +817,12 @@ function SimpleTraining({
                     </select>
                   </label>
                   <div className="card-actions split-actions">
+                    <button className="button primary" onClick={() => onStartTinyTest(profile)}>
+                      Start tiny test
+                    </button>
+                    <button className="button ghost" onClick={() => onRefreshTraining(profile)}>
+                      Refresh metrics
+                    </button>
                     {profile.gpu_target_id && (
                       <button className="button ghost" onClick={() => onCheckGpu(profile.gpu_target_id)}>
                         Check GPU
@@ -1079,6 +1155,7 @@ function App() {
   const [dataResult, setDataResult] = useState(null);
   const [documentResult, setDocumentResult] = useState(null);
   const [cppOutput, setCppOutput] = useState({});
+  const [trainingByAi, setTrainingByAi] = useState({});
 
   useEffect(() => {
     function handlePointerMove(event) {
@@ -1143,6 +1220,22 @@ function App() {
     await refreshAll();
   }
 
+  async function startTinyTest(profile) {
+    const result = await callTool("ai.start_tiny_test", { id: profile.id });
+    if (!result.error) {
+      setTrainingByAi((current) => ({ ...current, [profile.id]: result }));
+    }
+    await refreshAll();
+  }
+
+  async function refreshTraining(profile) {
+    const result = await callTool("ai.training_snapshot", { id: profile.id, limit: 60 });
+    if (!result.error) {
+      setTrainingByAi((current) => ({ ...current, [profile.id]: result }));
+    }
+    await refreshAll();
+  }
+
   async function deleteAI(profile) {
     const confirmed = window.confirm(
       `Delete AI profile "${profile.name}"?\n\nThis keeps its experiment record and logs.`,
@@ -1175,6 +1268,17 @@ function App() {
     refreshAll().then(() => callTool("system.report", {}));
   }, []);
 
+  useEffect(() => {
+    const runningProfiles = aiProfiles.filter((profile) => trainingByAi[profile.id]?.running);
+    if (runningProfiles.length === 0) return undefined;
+    const timer = window.setInterval(() => {
+      for (const profile of runningProfiles) {
+        refreshTraining(profile);
+      }
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [aiProfiles, trainingByAi]);
+
   return (
     <div className="shell">
       <Sidebar activeView={activeView} health={health} onSelect={setActiveView} />
@@ -1199,10 +1303,13 @@ function App() {
           <SimpleTraining
             aiProfiles={aiProfiles}
             gpuTargets={gpuTargets}
+            trainingByAi={trainingByAi}
             onCreateAI={createAI}
             onCreateGpu={createGpu}
             onAssignGpu={assignGpu}
             onCheckGpu={checkGpu}
+            onStartTinyTest={startTinyTest}
+            onRefreshTraining={refreshTraining}
             onDeleteAI={deleteAI}
           />
         )}

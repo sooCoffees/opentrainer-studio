@@ -13,6 +13,16 @@ def is_running(pid: int | None) -> bool:
         os.kill(pid, 0)
     except OSError:
         return False
+    status = subprocess.run(
+        ["ps", "-o", "stat=", "-p", str(pid)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if status.returncode != 0:
+        return False
+    if "Z" in status.stdout:
+        return False
     return True
 
 

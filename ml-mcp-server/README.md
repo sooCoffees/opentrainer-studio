@@ -75,6 +75,8 @@ Open `http://127.0.0.1:5173`. Vite proxies API calls to the Python server.
 
 - `experiment.*`: create/list/status experiment records.
 - `ai.*`: create/list/update/delete managed AI profiles and assign GPU targets.
+- `ai.start_tiny_test`: start a one-click tiny training smoke test for an AI.
+- `ai.training_snapshot`: return status, latest loss, speed, and recent metrics.
 - `gpu.*`: create/list local, rented, or remote GPU targets.
 - `gpu.check`: verify a remote control endpoint by calling its `/health`.
 - `system.report`: inspect local Torch/GPU capability through A2.
@@ -91,8 +93,9 @@ Open `http://127.0.0.1:5173`. Vite proxies API calls to the Python server.
 2. Create one AI profile by giving it a name and purpose.
 3. Add a data path, or use `Add Data` to inspect text/PDF inputs first.
 4. Choose `Local Machine` for a smoke test or connect an external GPU server.
-5. Run a tiny recipe first, then scale up after the setup works.
-6. Use `Advanced` only for raw tool calls, experiment debugging, and C++ service
+5. Click `Start tiny test`, then watch the status/loss/speed snapshot on the AI card.
+6. Scale up only after the tiny run works.
+7. Use `Advanced` only for raw tool calls, experiment debugging, and C++ service
    integration.
 
 ## Notes

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from array import array
 import json
 import sys
 import time
@@ -37,6 +38,39 @@ def _read_jsonl(path: Path, limit: int) -> list[dict[str, Any]]:
         except json.JSONDecodeError:
             rows.append({"raw": line})
     return rows
+
+
+def _resolve_a1_path(path: str | Path) -> Path:
+    candidate = Path(path).expanduser()
+    if candidate.is_absolute():
+        return candidate
+    if str(candidate).startswith("assignment1-basics/"):
+        return (A1_ROOT.parent / candidate).resolve()
+    return (A1_ROOT / candidate).resolve()
+
+
+def _ensure_debug_token_data() -> dict[str, str]:
+    data_dir = A1_ROOT / "artifacts" / "debug"
+    train_path = data_dir / "train.bin"
+    valid_path = data_dir / "valid.bin"
+    if train_path.exists() and valid_path.exists():
+        return {"train_bin": str(train_path), "valid_bin": str(valid_path)}
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+    # Deterministic toy token stream for smoke tests. It is intentionally tiny and
+    # synthetic: enough to validate the training loop without shipping datasets.
+    base = [(index * 17 + 11) % 500 for index in range(8192)]
+    train = array("H", base)
+    valid = array("H", list(reversed(base[:2048])))
+    with train_path.open("wb") as train_file:
+        train.tofile(train_file)
+    with valid_path.open("wb") as valid_file:
+        valid.tofile(valid_file)
+    return {"train_bin": str(train_path), "valid_bin": str(valid_path)}
+
+
+def _latest_metric(metrics: list[dict[str, Any]]) -> dict[str, Any] | None:
+    return metrics[-1] if metrics else None
 
 
 def _tool_schema(
@@ -147,6 +181,30 @@ class ToolRegistry:
                 ["id"],
             ),
             self.ai_delete,
+        )
+        self._register(
+            _tool_schema(
+                "ai.start_tiny_test",
+                "Start a tiny training smoke test for one AI profile using its experiment and default debug data.",
+                {
+                    "id": {"type": "string"},
+                    "config_path": {"type": "string"},
+                },
+                ["id"],
+            ),
+            self.ai_start_tiny_test,
+        )
+        self._register(
+            _tool_schema(
+                "ai.training_snapshot",
+                "Return simple training status and latest metrics for one AI profile.",
+                {
+                    "id": {"type": "string"},
+                    "limit": {"type": "integer"},
+                },
+                ["id"],
+            ),
+            self.ai_training_snapshot,
         )
         self._register(
             _tool_schema(
@@ -374,6 +432,102 @@ class ToolRegistry:
             "kept_experiment_id": profile.experiment_id,
         }
 
+    def ai_start_tiny_test(self, args: dict[str, Any]) -> dict[str, Any]:
+        profile = self.ai_store.get(args["id"])
+        if not profile.experiment_id:
+            experiment = self.store.create(
+                f"ai-{profile.id}",
+                f"{profile.name} training",
+                {"ai_profile_id": profile.id, "gpu_target_id": profile.gpu_target_id},
+            )
+            run_dir = EXPERIMENTS_DIR / experiment.id
+            run_dir.mkdir(parents=True, exist_ok=True)
+            experiment.run_dir = str(run_dir)
+            self.store.upsert(experiment)
+            profile.experiment_id = experiment.id
+            self.ai_store.upsert(profile)
+        else:
+            experiment = self.store.get(profile.experiment_id)
+
+        run_dir = Path(experiment.run_dir or EXPERIMENTS_DIR / experiment.id)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        a1_run_dir = run_dir / "tiny_a1_run"
+        metrics_path = a1_run_dir / "log.jsonl"
+        data_paths = _ensure_debug_token_data()
+
+        source_config_path = _resolve_a1_path(
+            args.get("config_path") or profile.config_path or "configs/debug_fixture.json"
+        )
+        config = json.loads(source_config_path.read_text(encoding="utf-8"))
+        config.update(
+            {
+                "train_bin": data_paths["train_bin"],
+                "valid_bin": data_paths["valid_bin"],
+                "out_dir": str(a1_run_dir),
+                "max_iters": min(int(config.get("max_iters", 10)), 10),
+                "eval_interval": min(int(config.get("eval_interval", 5)), 5),
+                "eval_iters": min(int(config.get("eval_iters", 2)), 2),
+                "log_interval": 1,
+                "compile": False,
+            }
+        )
+        tiny_config_path = run_dir / "tiny_config.json"
+        tiny_config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+        experiment.metadata.update(
+            {
+                "ai_profile_id": profile.id,
+                "gpu_target_id": profile.gpu_target_id,
+                "config_path": str(tiny_config_path),
+                "metrics_path": str(metrics_path),
+                "tiny_test": True,
+            }
+        )
+        self.store.upsert(experiment)
+        profile.config_path = str(tiny_config_path)
+        profile.status = "testing"
+        self.ai_store.upsert(profile)
+
+        started = self.training_start(
+            {"experiment_id": experiment.id, "config_path": str(tiny_config_path)}
+        )
+        metrics = self.training_metrics({"experiment_id": experiment.id, "limit": 60})
+        return {
+            "ai_profile": asdict(profile),
+            "experiment": started["experiment"],
+            "running": started["running"],
+            "metrics": metrics["metrics"],
+            "latest_metric": _latest_metric(metrics["metrics"]),
+            "next_step": "Wait for the tiny run to finish, then inspect loss and tokens/sec.",
+        }
+
+    def ai_training_snapshot(self, args: dict[str, Any]) -> dict[str, Any]:
+        profile = self.ai_store.get(args["id"])
+        if not profile.experiment_id:
+            return {
+                "ai_profile": asdict(profile),
+                "experiment": None,
+                "running": False,
+                "metrics": [],
+                "latest_metric": None,
+            }
+        status = self.training_status({"experiment_id": profile.experiment_id})
+        metrics = self.training_metrics(
+            {"experiment_id": profile.experiment_id, "limit": int(args.get("limit", 60))}
+        )
+        experiment = status["experiment"]
+        if not status["running"] and profile.status == "testing":
+            profile.status = "tested" if metrics["metrics"] else "test failed"
+            self.ai_store.upsert(profile)
+        return {
+            "ai_profile": asdict(profile),
+            "experiment": experiment,
+            "running": status["running"],
+            "metrics_path": metrics["path"],
+            "metrics": metrics["metrics"],
+            "latest_metric": _latest_metric(metrics["metrics"]),
+        }
+
     def ai_assign_gpu(self, args: dict[str, Any]) -> dict[str, Any]:
         self.gpu_store.get(args["gpu_target_id"])
         profile = self.ai_store.update(args["ai_id"], {"gpu_target_id": args["gpu_target_id"]})
@@ -490,6 +644,8 @@ class ToolRegistry:
         candidates = [
             run_dir / "metrics.jsonl",
             run_dir / "train_metrics.jsonl",
+            run_dir / "log.jsonl",
+            run_dir / "tiny_a1_run" / "log.jsonl",
             Path(experiment.metadata.get("metrics_path", "")),
         ]
         for candidate in candidates:
