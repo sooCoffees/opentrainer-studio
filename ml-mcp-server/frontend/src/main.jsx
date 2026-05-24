@@ -503,6 +503,7 @@ function SimpleTraining({
   onStartTinyTest,
   onRefreshTraining,
   onDeleteAI,
+  onChatAI,
 }) {
   const firstTarget = gpuTargets[0]?.id || "";
   const [form, setForm] = useState({
@@ -520,10 +521,15 @@ function SimpleTraining({
   });
   const [selectedAiId, setSelectedAiId] = useState(aiProfiles[0]?.id || "");
   const [materialPath, setMaterialPath] = useState("");
+  const [chatBaseUrl, setChatBaseUrl] = useState("http://127.0.0.1:8080");
+  const [chatDraft, setChatDraft] = useState("What did you learn from my training materials?");
+  const [chatByAi, setChatByAi] = useState({});
+  const [chatBusy, setChatBusy] = useState(false);
 
   const selectedProfile =
     aiProfiles.find((profile) => profile.id === selectedAiId) || aiProfiles[0] || null;
   const selectedTraining = selectedProfile ? trainingByAi[selectedProfile.id] || {} : {};
+  const selectedChat = selectedProfile ? chatByAi[selectedProfile.id] || [] : [];
 
   useEffect(() => {
     if (!form.gpu_target_id && firstTarget) {
@@ -599,6 +605,43 @@ function SimpleTraining({
   async function saveMaterials() {
     if (!selectedProfile) return;
     await onUpdateAI(selectedProfile.id, { dataset_path: materialPath });
+  }
+
+  function extractAssistantText(result) {
+    if (result?.error) return result.error;
+    return (
+      result?.text ||
+      result?.response ||
+      result?.completion ||
+      result?.output ||
+      result?.message ||
+      result?.json?.text ||
+      result?.json?.response ||
+      pretty(result)
+    );
+  }
+
+  async function sendChat() {
+    if (!selectedProfile || !chatDraft.trim() || chatBusy) return;
+    const prompt = chatDraft.trim();
+    setChatDraft("");
+    setChatBusy(true);
+    setChatByAi((current) => ({
+      ...current,
+      [selectedProfile.id]: [...(current[selectedProfile.id] || []), { role: "user", text: prompt }],
+    }));
+    const result = await onChatAI(selectedProfile, prompt, chatBaseUrl);
+    setChatByAi((current) => ({
+      ...current,
+      [selectedProfile.id]: [
+        ...(current[selectedProfile.id] || []),
+        {
+          role: result?.error ? "system" : "assistant",
+          text: extractAssistantText(result),
+        },
+      ],
+    }));
+    setChatBusy(false);
   }
 
   function TrainingChart({ metrics }) {
@@ -861,6 +904,48 @@ function SimpleTraining({
                 </div>
               </div>
               <TrainingChart metrics={selectedTraining.metrics} />
+            </div>
+
+            <div className="chat-workspace">
+              <div className="chat-head">
+                <div>
+                  <h4>4. Chat With This AI</h4>
+                  <p>
+                    This tests the model through your C++ AI service. Run training first, register
+                    the trained model in the service, then ask questions here.
+                  </p>
+                </div>
+                <span className="status-pill">model: {selectedProfile.id}</span>
+              </div>
+              <label>
+                C++ AI service URL
+                <input value={chatBaseUrl} onChange={(event) => setChatBaseUrl(event.target.value)} />
+              </label>
+              <div className="chat-window" aria-label="AI chat messages">
+                {selectedChat.length === 0 ? (
+                  <div className="chat-empty">
+                    No chat yet. Ask a question after the model is registered in your service.
+                  </div>
+                ) : (
+                  selectedChat.map((message, index) => (
+                    <div className={`chat-message ${message.role}`} key={`${message.role}-${index}`}>
+                      <strong>{message.role === "user" ? "You" : message.role === "system" ? "System" : "AI"}</strong>
+                      <p>{message.text}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="chat-compose">
+                <textarea
+                  rows={3}
+                  value={chatDraft}
+                  onChange={(event) => setChatDraft(event.target.value)}
+                  placeholder="Ask this AI something..."
+                />
+                <button className="button primary" onClick={sendChat} disabled={chatBusy}>
+                  {chatBusy ? "Sending..." : "Send"}
+                </button>
+              </div>
             </div>
           </>
         ) : (
@@ -1335,6 +1420,15 @@ function App() {
   async function callCpp(name, args) {
     const result = await callTool(name, args);
     setCppOutput(result);
+    return result;
+  }
+
+  async function chatAI(profile, prompt, baseUrl) {
+    return callCpp("cpp.generate", {
+      base_url: baseUrl,
+      model: profile.id,
+      prompt,
+    });
   }
 
   async function checkGpu(gpuTargetId, endpoint) {
@@ -1389,6 +1483,7 @@ function App() {
             onStartTinyTest={startTinyTest}
             onRefreshTraining={refreshTraining}
             onDeleteAI={deleteAI}
+            onChatAI={chatAI}
           />
         )}
         {activeView === "data" && (

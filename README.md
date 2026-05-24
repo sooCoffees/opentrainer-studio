@@ -16,6 +16,8 @@ rented GPU.
 - Tracks local or external GPU targets.
 - Runs a one-click tiny training smoke test before larger jobs.
 - Shows simple training snapshots: status, latest loss, tokens/sec, and loss trend.
+- Provides a per-AI chat panel that calls a C++ AI service once a trained model
+  is registered for serving.
 - Exposes training, data, scaling, system, and C++ service actions as JSON tools.
 - Provides a React frontend at `http://127.0.0.1:8765`.
 - Keeps the original CS336-style assignment modules available for deeper work.
@@ -29,10 +31,26 @@ rented GPU.
    - `Local Machine` for smoke tests and UI validation.
    - External GPU server when you rent or own a stronger machine.
 5. Click `Start tiny test`.
-6. Watch status, loss, and tokens/sec on the AI card.
-7. Scale the recipe only after the tiny run works.
-8. Use `Advanced` only for raw tools, experiment debugging, and C++ service
+6. Watch status, loss, and tokens/sec in that AI's training workspace.
+7. Register the trained model in your C++ AI service, then use `Chat With This
+   AI` to ask questions through the model.
+8. Scale the recipe only after the tiny run works.
+9. Use `Advanced` only for raw tools, experiment debugging, and C++ service
    integration.
+
+## How To See Results
+
+There are two kinds of results:
+
+1. Training health: `Training status`, `Latest loss`, `Tokens/sec`, and the loss
+   chart show whether the run is working.
+2. Model behavior: `Chat With This AI` sends prompts to your C++ AI service using
+   the current AI profile id as the model id.
+
+The tiny test is a smoke test. It proves the training stack is wired correctly;
+it is not expected to produce a smart assistant. For real answers, train or load
+a model, register it in `cpp-ai-service`, and then chat with it from the AI
+workspace.
 
 ## Quick Start
 

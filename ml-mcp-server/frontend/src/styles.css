@@ -925,6 +925,104 @@ select:focus {
   margin: 0;
 }
 
+.chat-workspace {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(31, 111, 235, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.88)),
+    radial-gradient(circle at 0% 100%, rgba(31, 111, 235, 0.1), transparent 34%);
+}
+
+.chat-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.chat-head h4 {
+  margin: 0 0 5px;
+  font-size: 16px;
+}
+
+.chat-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.chat-window {
+  min-height: 180px;
+  max-height: 340px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.94);
+  overflow: auto;
+}
+
+.chat-empty {
+  min-height: 154px;
+  display: grid;
+  place-items: center;
+  color: #cbd5e1;
+  font-size: 13px;
+  text-align: center;
+}
+
+.chat-message {
+  max-width: min(760px, 92%);
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e5eefb;
+}
+
+.chat-message.user {
+  justify-self: end;
+  background: linear-gradient(135deg, rgba(31, 111, 235, 0.9), rgba(20, 184, 166, 0.72));
+  color: #ffffff;
+}
+
+.chat-message.system {
+  border: 1px solid rgba(245, 158, 11, 0.32);
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.chat-message strong {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  opacity: 0.82;
+}
+
+.chat-message p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+
+.chat-compose {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.chat-compose textarea {
+  min-height: 70px;
+}
+
 .copy-line {
   padding: 11px;
   margin: 2px 0 14px;
@@ -1451,9 +1549,14 @@ select:focus {
   }
 
   .workspace-head,
+  .chat-head,
   .selector-card {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .chat-compose {
+    grid-template-columns: 1fr;
   }
 
   .simple-flow,
