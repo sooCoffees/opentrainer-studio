@@ -14,8 +14,11 @@ from a browser, an agent, or another service.
 - Lets each AI answer from attached `.jsonl`, `.md`, `.txt`, or `.csv` files
   before any model training.
 - Supports browser-based knowledge file upload for text, Markdown, JSONL, and CSV.
+- Provides a guided readiness strip so users know whether knowledge, chat,
+  training check, and publishing are ready.
+- Can generate an `identity.md` knowledge file from simple form fields.
 - Shows each AI's knowledge library with file previews and character counts.
-- Shows answer sources for instant file-based replies.
+- Shows expandable answer sources for instant file-based replies.
 - Ingests text and document paths for future knowledge and training pipelines.
 - Tracks local or external GPU targets.
 - Runs a one-click tiny training environment check before larger jobs.

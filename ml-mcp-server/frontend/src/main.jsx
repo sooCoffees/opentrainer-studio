@@ -535,12 +535,19 @@ function SimpleTraining({
   const [knowledgeByAi, setKnowledgeByAi] = useState({});
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadMessage, setUploadMessage] = useState("");
+  const [identityName, setIdentityName] = useState("");
+  const [identityRole, setIdentityRole] = useState("");
+  const [identityStyle, setIdentityStyle] = useState("Clear, honest, and helpful.");
 
   const selectedProfile =
     aiProfiles.find((profile) => profile.id === selectedAiId) || aiProfiles[0] || null;
   const selectedTraining = selectedProfile ? trainingByAi[selectedProfile.id] || {} : {};
   const selectedChat = selectedProfile ? chatByAi[selectedProfile.id] || [] : [];
   const selectedKnowledge = selectedProfile ? knowledgeByAi[selectedProfile.id] || [] : [];
+  const hasKnowledge = Boolean(selectedProfile?.dataset_path) || selectedKnowledge.length > 0;
+  const hasChatted = selectedChat.some((message) => message.role === "assistant");
+  const trainingChecked = Boolean(selectedTraining.metrics?.length || selectedTraining.latest_metric);
+  const readyToPublish = trainingChecked && hasChatted;
 
   useEffect(() => {
     if (!form.gpu_target_id && firstTarget) {
@@ -558,6 +565,8 @@ function SimpleTraining({
     if (selectedProfile) {
       setMaterialPath(selectedProfile.dataset_path || "");
       setModelPath(selectedProfile.metadata?.model_path || selectedProfile.metadata?.checkpoint_path || "");
+      setIdentityName(selectedProfile.name || "");
+      setIdentityRole(selectedProfile.purpose || "");
       refreshKnowledge(selectedProfile);
     } else {
       setMaterialPath("");
@@ -655,6 +664,28 @@ function SimpleTraining({
     } finally {
       setUploadBusy(false);
       event.target.value = "";
+    }
+  }
+
+  async function addIdentityTemplate() {
+    if (!selectedProfile || uploadBusy) return;
+    const name = identityName.trim() || selectedProfile.name;
+    const role = identityRole.trim() || selectedProfile.purpose || "Help the user understand attached materials.";
+    const style = identityStyle.trim() || "Clear, honest, and helpful.";
+    const content = `# Identity\n\nName: ${name}\n\nI am ${name}. ${role}\n\nWhen someone asks who I am, I should say that I am ${name}.\n\nStyle: ${style}\n\nIf I do not know an answer from my attached knowledge files, I should say I do not know and explain what file would help.`;
+    setUploadBusy(true);
+    setUploadMessage("");
+    try {
+      const result = await onUploadKnowledge(selectedProfile.id, "identity.md", content);
+      if (result?.ok) {
+        setMaterialPath(result.ai_profile?.dataset_path || materialPath);
+        setUploadMessage("Identity file added. Try asking: 你是谁");
+        await refreshKnowledge(selectedProfile);
+      } else {
+        setUploadMessage(result?.error || "Could not add identity file.");
+      }
+    } finally {
+      setUploadBusy(false);
     }
   }
 
@@ -909,26 +940,48 @@ function SimpleTraining({
             </div>
 
             <div className="builder-flow" aria-label="AI builder stages">
-              <div>
+              <div className={hasKnowledge ? "done" : "current"}>
                 <span>1</span>
                 <strong>Knowledge</strong>
-                <small>Attach files this AI can read now.</small>
+                <small>{hasKnowledge ? "Files attached." : "Attach files this AI can read now."}</small>
               </div>
-              <div>
+              <div className={hasChatted ? "done" : hasKnowledge ? "current" : ""}>
                 <span>2</span>
                 <strong>Chat</strong>
-                <small>Ask from files before training.</small>
+                <small>{hasChatted ? "Answered from files." : "Ask from files before training."}</small>
               </div>
-              <div>
+              <div className={trainingChecked ? "done" : hasChatted ? "current" : ""}>
                 <span>3</span>
                 <strong>Train</strong>
-                <small>Upgrade model weights when needed.</small>
+                <small>{trainingChecked ? "Environment checked." : "Check training only when needed."}</small>
               </div>
-              <div>
+              <div className={readyToPublish ? "current" : ""}>
                 <span>4</span>
                 <strong>Publish</strong>
                 <small>Connect C++ service, RAG, or MCP.</small>
               </div>
+            </div>
+
+            <div className="start-here">
+              <div>
+                <p className="eyebrow">Start here</p>
+                <h4>
+                  {!hasKnowledge
+                    ? "Add knowledge so this AI has something to answer from."
+                    : !hasChatted
+                      ? "Ask a question from the attached knowledge."
+                      : !trainingChecked
+                        ? "Optional: check whether this machine can train."
+                        : "Optional: publish this AI when the local answers are useful."}
+                </h4>
+              </div>
+              <strong>
+                {hasKnowledge ? "Knowledge ready" : "Needs knowledge"}
+                {" · "}
+                {hasChatted ? "Chat tested" : "Chat not tested"}
+                {" · "}
+                {trainingChecked ? "Training checked" : "Training unchecked"}
+              </strong>
             </div>
 
             <div className="workspace-grid">
@@ -950,6 +1003,28 @@ function SimpleTraining({
                   />
                 </label>
                 {uploadMessage && <div className="inline-note">{uploadMessage}</div>}
+                <details className="identity-builder">
+                  <summary>Add identity file</summary>
+                  <label>
+                    AI name
+                    <input value={identityName} onChange={(event) => setIdentityName(event.target.value)} />
+                  </label>
+                  <label>
+                    What should it be?
+                    <textarea
+                      rows={3}
+                      value={identityRole}
+                      onChange={(event) => setIdentityRole(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Style
+                    <input value={identityStyle} onChange={(event) => setIdentityStyle(event.target.value)} />
+                  </label>
+                  <button className="button ghost wide" onClick={addIdentityTemplate} disabled={uploadBusy}>
+                    Add Identity File
+                  </button>
+                </details>
                 <label>
                   Knowledge path
                   <input
@@ -1111,10 +1186,13 @@ function SimpleTraining({
                       {message.sources?.length > 0 && (
                         <div className="source-list">
                           {message.sources.map((source, sourceIndex) => (
-                            <div className="source-item" key={`${source.path}-${sourceIndex}`}>
-                              <span>{source.title || source.path}</span>
-                              <small>{source.path}</small>
-                            </div>
+                            <details className="source-item" key={`${source.path}-${sourceIndex}`}>
+                              <summary>
+                                <span>{source.title || source.path}</span>
+                                <small>{source.path}</small>
+                              </summary>
+                              <p>{source.text}</p>
+                            </details>
                           ))}
                         </div>
                       )}

@@ -893,6 +893,17 @@ select:focus {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.builder-flow div.done {
+  border-color: rgba(20, 184, 166, 0.26);
+  background: rgba(240, 253, 250, 0.82);
+}
+
+.builder-flow div.current {
+  border-color: rgba(31, 111, 235, 0.32);
+  background: rgba(239, 246, 255, 0.9);
+  box-shadow: 0 14px 34px rgba(31, 111, 235, 0.11);
+}
+
 .builder-flow span {
   grid-row: span 2;
   width: 28px;
@@ -913,6 +924,35 @@ select:focus {
 .builder-flow small {
   color: var(--muted);
   line-height: 1.35;
+}
+
+.start-here {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(20, 184, 166, 0.24);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(240, 253, 250, 0.9), rgba(255, 255, 255, 0.88)),
+    radial-gradient(circle at 100% 0%, rgba(31, 111, 235, 0.1), transparent 32%);
+}
+
+.start-here h4,
+.start-here p {
+  margin: 0;
+}
+
+.start-here h4 {
+  margin-top: 3px;
+}
+
+.start-here strong {
+  flex: 0 0 auto;
+  color: #0f766e;
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .workspace-grid {
@@ -976,6 +1016,23 @@ select:focus {
   color: #0f766e;
   font-size: 12px;
   font-weight: 700;
+}
+
+.identity-builder {
+  border: 1px solid rgba(31, 111, 235, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 10px 12px;
+}
+
+.identity-builder summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.identity-builder label:first-of-type {
+  margin-top: 12px;
 }
 
 .train-box {
@@ -1163,6 +1220,12 @@ select:focus {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.source-item summary {
+  display: grid;
+  gap: 2px;
+  cursor: pointer;
+}
+
 .source-item span,
 .source-item small {
   overflow-wrap: anywhere;
@@ -1176,6 +1239,14 @@ select:focus {
 .source-item small {
   color: #cbd5e1;
   font-size: 11px;
+}
+
+.source-item p {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e5eefb;
+  font-size: 12px;
 }
 
 .chat-compose {
@@ -1717,9 +1788,14 @@ select:focus {
 
   .workspace-head,
   .chat-head,
+  .start-here,
   .selector-card {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .start-here strong {
+    flex: 1 1 auto;
   }
 
   .chat-compose {
