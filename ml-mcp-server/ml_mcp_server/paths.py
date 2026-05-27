@@ -14,6 +14,7 @@ A5_ROOT = WORKSPACE_ROOT / "assignment5-alignment"
 
 STATE_DIR = SERVER_ROOT / "state"
 EXPERIMENTS_DIR = SERVER_ROOT / "experiments"
+KNOWLEDGE_DIR = SERVER_ROOT / "knowledge"
 EXPERIMENTS_JSON = STATE_DIR / "experiments.json"
 AI_PROFILES_JSON = STATE_DIR / "ai_profiles.json"
 GPU_TARGETS_JSON = STATE_DIR / "gpu_targets.json"
@@ -29,3 +30,4 @@ def python_bin(project_root: Path) -> Path:
 def ensure_dirs() -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
+    KNOWLEDGE_DIR.mkdir(parents=True, exist_ok=True)

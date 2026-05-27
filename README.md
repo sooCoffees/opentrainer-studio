@@ -13,6 +13,9 @@ from a browser, an agent, or another service.
 - Creates separate AI profiles for different model ideas.
 - Lets each AI answer from attached `.jsonl`, `.md`, `.txt`, or `.csv` files
   before any model training.
+- Supports browser-based knowledge file upload for text, Markdown, JSONL, and CSV.
+- Shows each AI's knowledge library with file previews and character counts.
+- Shows answer sources for instant file-based replies.
 - Ingests text and document paths for future knowledge and training pipelines.
 - Tracks local or external GPU targets.
 - Runs a one-click tiny training environment check before larger jobs.
@@ -28,7 +31,8 @@ from a browser, an agent, or another service.
 
 1. Open `My AIs`.
 2. Create one AI by giving it a name and purpose.
-3. Add a knowledge path, or go to `Knowledge Tools` to inspect PDFs/text first.
+3. Choose knowledge files directly, paste a knowledge path, or go to
+   `Knowledge Tools` to inspect PDFs/text first.
 4. Ask questions in `Instant knowledge from files`.
 5. Choose a training computer only when you want model-weight training:
    - `Local Machine` for smoke tests and UI validation.

@@ -506,6 +506,8 @@ function SimpleTraining({
   onChatAI,
   onCheckChatService,
   onRegisterModel,
+  onUploadKnowledge,
+  onListKnowledge,
 }) {
   const firstTarget = gpuTargets[0]?.id || "";
   const [form, setForm] = useState({
@@ -530,11 +532,15 @@ function SimpleTraining({
   const [chatMode, setChatMode] = useState("data");
   const [modelPath, setModelPath] = useState("");
   const [modelBackend, setModelBackend] = useState("python");
+  const [knowledgeByAi, setKnowledgeByAi] = useState({});
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
 
   const selectedProfile =
     aiProfiles.find((profile) => profile.id === selectedAiId) || aiProfiles[0] || null;
   const selectedTraining = selectedProfile ? trainingByAi[selectedProfile.id] || {} : {};
   const selectedChat = selectedProfile ? chatByAi[selectedProfile.id] || [] : [];
+  const selectedKnowledge = selectedProfile ? knowledgeByAi[selectedProfile.id] || [] : [];
 
   useEffect(() => {
     if (!form.gpu_target_id && firstTarget) {
@@ -552,6 +558,7 @@ function SimpleTraining({
     if (selectedProfile) {
       setMaterialPath(selectedProfile.dataset_path || "");
       setModelPath(selectedProfile.metadata?.model_path || selectedProfile.metadata?.checkpoint_path || "");
+      refreshKnowledge(selectedProfile);
     } else {
       setMaterialPath("");
       setModelPath("");
@@ -612,6 +619,43 @@ function SimpleTraining({
   async function saveMaterials() {
     if (!selectedProfile) return;
     await onUpdateAI(selectedProfile.id, { dataset_path: materialPath });
+    await refreshKnowledge(selectedProfile);
+  }
+
+  async function refreshKnowledge(profile = selectedProfile) {
+    if (!profile) return;
+    const result = await onListKnowledge(profile.id);
+    if (!result.error && result.files) {
+      setKnowledgeByAi((current) => ({ ...current, [profile.id]: result.files }));
+    }
+  }
+
+  async function uploadKnowledgeFiles(event) {
+    if (!selectedProfile) return;
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+    setUploadBusy(true);
+    setUploadMessage("");
+    try {
+      let uploaded = 0;
+      for (const file of files) {
+        const content = await file.text();
+        const result = await onUploadKnowledge(selectedProfile.id, file.name, content);
+        if (result?.ok) {
+          uploaded += 1;
+          setMaterialPath(result.ai_profile?.dataset_path || materialPath);
+        } else {
+          setUploadMessage(result?.error || "Some files could not be uploaded.");
+        }
+      }
+      await refreshKnowledge(selectedProfile);
+      if (uploaded > 0) {
+        setUploadMessage(`${uploaded} file${uploaded === 1 ? "" : "s"} added to this AI.`);
+      }
+    } finally {
+      setUploadBusy(false);
+      event.target.value = "";
+    }
   }
 
   function extractAssistantText(result) {
@@ -648,6 +692,7 @@ function SimpleTraining({
         {
           role: result?.error ? "system" : "assistant",
           text: extractAssistantText(result),
+          sources: result?.sources || [],
         },
       ],
     }));
@@ -893,6 +938,18 @@ function SimpleTraining({
                   Paste a folder or file path for PDFs, notes, text, or JSONL. This becomes usable
                   immediately in chat.
                 </p>
+                <label className="file-drop">
+                  <span>{uploadBusy ? "Adding files..." : "Choose knowledge files"}</span>
+                  <small>.txt, .md, .jsonl, .csv</small>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".txt,.md,.jsonl,.csv,text/*"
+                    onChange={uploadKnowledgeFiles}
+                    disabled={uploadBusy}
+                  />
+                </label>
+                {uploadMessage && <div className="inline-note">{uploadMessage}</div>}
                 <label>
                   Knowledge path
                   <input
@@ -992,6 +1049,36 @@ function SimpleTraining({
               <TrainingChart metrics={selectedTraining.metrics} />
             </div>
 
+            <div className="knowledge-library">
+              <div className="chat-head">
+                <div>
+                  <h4>Knowledge Library</h4>
+                  <p>Files this AI can use immediately in Instant knowledge mode.</p>
+                </div>
+                <button className="button ghost" onClick={() => refreshKnowledge(selectedProfile)}>
+                  Refresh Files
+                </button>
+              </div>
+              {selectedKnowledge.length === 0 ? (
+                <div className="empty-state">
+                  <strong>No readable files attached</strong>
+                  <span>Choose a text knowledge file above or paste a folder path.</span>
+                </div>
+              ) : (
+                <div className="knowledge-list">
+                  {selectedKnowledge.map((file) => (
+                    <div className="knowledge-item" key={file.path}>
+                      <div>
+                        <strong>{file.name}</strong>
+                        <span>{file.type} · {file.characters.toLocaleString()} characters</span>
+                      </div>
+                      <p>{file.preview}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="chat-workspace">
               <div className="chat-head">
                 <div>
@@ -1021,6 +1108,16 @@ function SimpleTraining({
                     <div className={`chat-message ${message.role}`} key={`${message.role}-${index}`}>
                       <strong>{message.role === "user" ? "You" : message.role === "system" ? "System" : "AI"}</strong>
                       <p>{message.text}</p>
+                      {message.sources?.length > 0 && (
+                        <div className="source-list">
+                          {message.sources.map((source, sourceIndex) => (
+                            <div className="source-item" key={`${source.path}-${sourceIndex}`}>
+                              <span>{source.title || source.path}</span>
+                              <small>{source.path}</small>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -1586,6 +1683,16 @@ function App() {
     });
   }
 
+  async function uploadKnowledge(aiId, filename, content) {
+    const result = await callTool("ai.add_knowledge_file", { id: aiId, filename, content });
+    await refreshAll();
+    return result;
+  }
+
+  async function listKnowledge(aiId) {
+    return callTool("ai.knowledge", { id: aiId });
+  }
+
   async function checkGpu(gpuTargetId, endpoint) {
     await callTool("gpu.check", { gpu_target_id: gpuTargetId, endpoint });
   }
@@ -1641,6 +1748,8 @@ function App() {
             onChatAI={chatAI}
             onCheckChatService={checkChatService}
             onRegisterModel={registerModel}
+            onUploadKnowledge={uploadKnowledge}
+            onListKnowledge={listKnowledge}
           />
         )}
         {activeView === "data" && (

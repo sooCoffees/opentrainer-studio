@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .http_client import http_json
-from .paths import A1_ROOT, A2_ROOT, A3_ROOT, A4_ROOT, EXPERIMENTS_DIR, python_bin
+from .paths import A1_ROOT, A2_ROOT, A3_ROOT, A4_ROOT, EXPERIMENTS_DIR, KNOWLEDGE_DIR, python_bin
 from .processes import is_running, run_capture, spawn, terminate
 from .state import AIProfileStore, ExperimentStore, GpuTargetStore
 
@@ -124,6 +124,28 @@ def _identity_line(rows: list[dict[str, str]]) -> str | None:
             if line and any(marker in lowered or marker in line for marker in markers):
                 return line[:500]
     return None
+
+
+def _safe_filename(name: str) -> str:
+    candidate = Path(name or "knowledge.txt").name
+    safe = "".join(ch if ch.isalnum() or ch in "._- " else "_" for ch in candidate).strip()
+    return safe[:120] or "knowledge.txt"
+
+
+def _ai_knowledge_dir(ai_id: str) -> Path:
+    return KNOWLEDGE_DIR / _safe_filename(ai_id)
+
+
+def _knowledge_file_info(path: Path) -> dict[str, Any]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return {
+        "name": path.name,
+        "path": str(path),
+        "type": path.suffix.lower().lstrip(".") or "text",
+        "characters": len(text),
+        "modified_at": path.stat().st_mtime,
+        "preview": text[:500],
+    }
 
 
 def _latest_metric(metrics: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -293,6 +315,28 @@ class ToolRegistry:
                 ["id", "prompt"],
             ),
             self.ai_answer_from_data,
+        )
+        self._register(
+            _tool_schema(
+                "ai.add_knowledge_file",
+                "Attach a text knowledge file to one AI profile.",
+                {
+                    "id": {"type": "string"},
+                    "filename": {"type": "string"},
+                    "content": {"type": "string"},
+                },
+                ["id", "filename", "content"],
+            ),
+            self.ai_add_knowledge_file,
+        )
+        self._register(
+            _tool_schema(
+                "ai.knowledge",
+                "List readable knowledge files attached to one AI profile.",
+                {"id": {"type": "string"}},
+                ["id"],
+            ),
+            self.ai_knowledge,
         )
         self._register(
             _tool_schema(
@@ -734,6 +778,62 @@ class ToolRegistry:
             "model": profile.id,
             "text": text,
             "sources": selected,
+        }
+
+    def ai_add_knowledge_file(self, args: dict[str, Any]) -> dict[str, Any]:
+        profile = self.ai_store.get(args["id"])
+        filename = _safe_filename(args["filename"])
+        suffix = Path(filename).suffix.lower()
+        if suffix not in {".txt", ".md", ".jsonl", ".csv"}:
+            return {
+                "ok": False,
+                "stage": "unsupported_type",
+                "error": "This uploader currently supports .txt, .md, .jsonl, and .csv.",
+                "next_step": "Use Knowledge Tools for PDF extraction first, then attach the extracted text.",
+            }
+        content = str(args.get("content", ""))
+        if not content.strip():
+            return {
+                "ok": False,
+                "stage": "empty_file",
+                "error": "The selected file has no readable text.",
+                "next_step": "Choose a text-based file or extract text from the original document first.",
+            }
+
+        knowledge_dir = _ai_knowledge_dir(profile.id)
+        knowledge_dir.mkdir(parents=True, exist_ok=True)
+        target = knowledge_dir / filename
+        target.write_text(content, encoding="utf-8")
+
+        profile.dataset_path = str(knowledge_dir)
+        files = profile.metadata.get("knowledge_files", [])
+        files = [item for item in files if item.get("path") != str(target)]
+        files.append({"name": filename, "path": str(target), "characters": len(content), "added_at": time.time()})
+        profile.metadata["knowledge_files"] = files
+        self.ai_store.upsert(profile)
+        return {
+            "ok": True,
+            "ai_profile": asdict(profile),
+            "file": _knowledge_file_info(target),
+            "knowledge_dir": str(knowledge_dir),
+            "next_step": "Ask a question in Instant knowledge from files mode.",
+        }
+
+    def ai_knowledge(self, args: dict[str, Any]) -> dict[str, Any]:
+        profile = self.ai_store.get(args["id"])
+        rows = _read_profile_data(profile.dataset_path)
+        files: list[dict[str, Any]] = []
+        path = Path(profile.dataset_path).expanduser() if profile.dataset_path else None
+        paths = sorted(item for item in path.iterdir() if item.is_file()) if path and path.is_dir() else ([path] if path else [])
+        for item in paths:
+            if item and item.exists() and item.suffix.lower() in {".txt", ".md", ".jsonl", ".csv"}:
+                files.append(_knowledge_file_info(item))
+        return {
+            "ok": True,
+            "ai_profile": asdict(profile),
+            "knowledge_path": profile.dataset_path,
+            "files": files,
+            "chunks": rows,
         }
 
     def ai_assign_gpu(self, args: dict[str, Any]) -> dict[str, Any]:
